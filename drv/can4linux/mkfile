@@ -1,0 +1,18 @@
+OSARCH=\
+	linux_386\
+#	linux_amd64\
+
+ZFILES=\
+	${OSARCH:%=ztypes_%.go}\
+	${OSARCH:%=zcan4linux_%.go}\
+
+all:V: $ZFILES
+
+clean:V:
+	rm -rf _obj	# created by cgo
+
+nuke:V:
+	rm -f $ZFILES
+
+ztypes_linux_%.go zcan4linux_linux_%.go:	types_linux.go can4linux_linux.go gen.sh
+	GOOS=linux GOARCH=$stem sh ./gen.sh

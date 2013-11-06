@@ -1,0 +1,43 @@
+candir=../..
+pcanapi=$candir/drv/pcan/api
+dir = can
+
+flag e +
+
+fn rebuildnonstdpkg{
+	go list -f '{{if not .Standard}}go install -v {{.ImportPath}}{{end}}' $*
+}
+fn rebuildimports{
+	go list -f 'rebuildnonstdpkg {{range .Imports}} {{.}}{{end}}' |  rc
+}
+fn build{
+	os=$1
+	arch=$2
+	echo build $os-$arch
+	d=$dir/$os^_$arch
+	mkdir -p $d
+
+	GOOS=$os GOARCH=$arch rebuildimports | rc
+	GOOS=$os GOARCH=$arch go build -o $d/can$3
+}
+
+rm -rf $dir
+
+mkdir $dir
+
+build windows 386 .exe
+build windows amd64 .exe
+build linux 386 ''
+build linux amd64 ''
+cp $pcanapi/windows/386/PCANBasic.dll $dir/windows_386/
+cp $pcanapi/windows/amd64/PCANBasic.dll $dir/windows_amd64/
+
+9 date > $dir/DATE
+grep '^const version' main.go | sed 's,"$,,;s,.*",,' > $dir/VERSION
+
+vdir=$dir-`{cat $dir/VERSION}
+rm $dir/VERSION
+mv $dir $vdir
+tar czvf $vdir.tar.gz $vdir
+
+rm -rf $vdir
