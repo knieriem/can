@@ -60,7 +60,7 @@ func (*driver) Scan() (list []string) {
 	return
 }
 
-func (drv *driver) Open(devName string) (cd can.Device, err error) {
+func (drv *driver) Open(devName string, _ ...interface{}) (cd can.Device, err error) {
 	d := new(dev)
 
 	if devName == "" {

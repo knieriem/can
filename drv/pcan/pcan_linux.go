@@ -61,7 +61,7 @@ type dev struct {
 	}
 }
 
-func (*driver) Open(devName string) (cd can.Device, err error) {
+func (*driver) Open(devName string, options ...interface{}) (cd can.Device, err error) {
 	defer wrapErr("open", &err)
 
 	hwList, err := parseProcfile()
@@ -87,8 +87,13 @@ func (*driver) Open(devName string) (cd can.Device, err error) {
 	d.file = f
 	d.h = api.Fd(f.Fd())
 
+	bitrate, err := scanOptions(options)
+	if err != nil {
+		return
+	}
+
 	var i api.Init
-	i.WBTR0BTR1 = defaultBitrate
+	i.WBTR0BTR1 = bitrate
 	i.UcCANMsgType = api.MsgExtended
 	err = d.h.Init(&i)
 	if err != nil {

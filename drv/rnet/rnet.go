@@ -84,7 +84,7 @@ func newDev(conn io.ReadWriter, c io.Closer) (d *dev) {
 	return
 }
 
-func (*driver) Open(devName string) (cd can.Device, err error) {
+func (*driver) Open(devName string, _ ...interface{}) (cd can.Device, err error) {
 	var conn net.Conn
 
 	if devName == "" {

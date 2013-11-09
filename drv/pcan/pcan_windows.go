@@ -113,7 +113,7 @@ func (*driver) Scan() (list []string) {
 	return
 }
 
-func (*driver) Open(devName string) (cd can.Device, err error) {
+func (*driver) Open(devName string, options ...interface{}) (cd can.Device, err error) {
 	defer wrapErr("open", &err)
 	d := new(dev)
 
@@ -136,7 +136,11 @@ func (*driver) Open(devName string) (cd can.Device, err error) {
 		return
 	}
 
-	if err = h.Initialize(defaultBitrate, 0, 0, 0).Err(); err != nil {
+	bitrate, err := scanOptions(options)
+	if err != nil {
+		return
+	}
+	if err = h.Initialize(api.Baudrate(bitrate), 0, 0, 0).Err(); err != nil {
 		return
 	}
 

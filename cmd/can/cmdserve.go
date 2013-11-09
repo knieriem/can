@@ -37,7 +37,7 @@ func runServe(cmd *Command, w io.Writer, args []string) {
 	if len(args) > 1 {
 		devName = args[1]
 	}
-	d, err := can.Open(devName, "")
+	d, err := can.Open(devName)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -12,7 +12,7 @@ import (
 type Driver interface {
 	Name() string
 	//	Version() string
-	Open(name string) (Device, error)
+	Open(name string, options ...interface{}) (Device, error)
 	Scan() []string
 }
 
@@ -47,13 +47,22 @@ type Device interface {
 //	driverName:deviceName:[,option][,option2]
 //
 //	name	Go driver name
-func Open(deviceName string, ctl string) (dev Device, err error) {
-	f := strings.SplitN(deviceName, ":", 2)
+func Open(deviceName string, options ...string) (dev Device, err error) {
+	f := strings.Split(deviceName, ",")
+	optFields := f[1:]
+	optList, err := parseOptions(optFields)
+	if err != nil {
+		return
+	}
+	deviceName = f[0]
+
+	f = strings.SplitN(deviceName, ":", 2)
 	name := ""
 
-	if f[0] == "" {
+	drvName := f[0]
+	if drvName == "" {
 		for _, drv := range drvlist {
-			dev, err = drv.Open(name)
+			dev, err = drv.Open(name, optList...)
 			if err == nil {
 				return
 			}
@@ -67,11 +76,11 @@ func Open(deviceName string, ctl string) (dev Device, err error) {
 	}
 
 	for _, drv := range drvlist {
-		if drv.Name() == f[0] {
-			return drv.Open(name)
+		if drv.Name() == drvName {
+			return drv.Open(name, optList...)
 		}
 	}
-	err = errors.New("driver not found: " + f[0])
+	err = errors.New("driver not found: " + drvName)
 	return
 }
 
