@@ -7,7 +7,6 @@ package pcan
 import (
 	"errors"
 	"io"
-	"log"
 	"strconv"
 	"strings"
 	"syscall"
@@ -206,7 +205,6 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 				buf[n] = can.Msg{
 					Flags: errFlagsMap.Decode(int(st)) | can.StatusMsg,
 				}
-				log.Println("ERR", ts.Millis, st)
 				n++
 				prevSt = st
 				return

@@ -7,7 +7,6 @@ package pcan
 import (
 	"errors"
 	"io"
-	"log"
 	"os"
 	"strconv"
 
@@ -138,7 +137,6 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 			if st != prevSt {
 				prevSt = st
 				n++
-				log.Println("BUSERR", st)
 				return
 			}
 		}
