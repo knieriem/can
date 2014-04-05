@@ -33,6 +33,10 @@ func (f Flags) ExtFrame() bool {
 	return f&ExtFrame != 0
 }
 
+func (f Flags) Test(t Flags) bool {
+	return (f & t) == t
+}
+
 // Definition of a CAN Message.
 type Msg struct {
 	Id uint32 // The CAN message identifier
