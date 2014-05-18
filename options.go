@@ -6,7 +6,8 @@ import (
 )
 
 type (
-	Bitrate int32
+	Bitrate     int32
+	Termination bool
 )
 
 func parseOptions(optFields []string) (list []interface{}, err error) {
@@ -15,11 +16,15 @@ func parseOptions(optFields []string) (list []interface{}, err error) {
 			err = errors.New("empty option")
 			return
 		}
+		var opt interface{}
 		if b, ok := parseBitrate(s); ok {
-			list = append(list, b)
+			opt = b
+		} else if s == "T" {
+			opt = Termination(true)
 		} else {
-			list = append(list, s)
+			opt = s
 		}
+		list = append(list, opt)
 	}
 	return
 }

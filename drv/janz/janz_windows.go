@@ -53,7 +53,7 @@ func (*driver) Name() string {
 	return "janz"
 }
 
-func scanOptions(list []interface{}) (bitrate uint16, err error) {
+func scanOptions(list []interface{}) (bitrate uint16, term bool, err error) {
 	bitrate = defaultBitrate
 	for _, opt := range list {
 		switch v := opt.(type) {
@@ -64,6 +64,8 @@ func scanOptions(list []interface{}) (bitrate uint16, err error) {
 				err = errors.New("bitrate not supported")
 				return
 			}
+		case can.Termination:
+			term = bool(v)
 		}
 	}
 	return
@@ -72,6 +74,7 @@ func scanOptions(list []interface{}) (bitrate uint16, err error) {
 type dev struct {
 	name can.Name
 	fd   int
+	term bool
 }
 
 func (*driver) Scan() (list []can.Name) {
@@ -122,7 +125,7 @@ func (*driver) Open(devName string, options ...interface{}) (cd can.Device, err 
 	}
 
 found:
-	bitrate, err := scanOptions(options)
+	bitrate, term, err := scanOptions(options)
 	if err != nil {
 		return
 	}
@@ -152,6 +155,15 @@ found:
 	if err != nil {
 		goto closeHelper
 	}
+	if term {
+		err = pcan.ConfigTerm(fd, 1)
+	} else {
+		err = pcan.ConfigTerm(fd, 0)
+	}
+	if err != nil {
+		return
+	}
+	d.term = term
 
 	cd = d
 	return
@@ -276,6 +288,9 @@ func encode(dst *pcan.MsgData, src *can.Msg) {
 }
 
 func (d *dev) Close() (err error) {
+	if d.term {
+		pcan.ConfigTerm(d.fd, 0)
+	}
 	pcan.BusOff(d.fd)
 	pcan.CloseHelper(d.fd)
 	pcan.Close(d.fd)
