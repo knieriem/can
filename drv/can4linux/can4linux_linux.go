@@ -18,6 +18,7 @@ import (
 
 type dev struct {
 	fd     int
+	name   string
 	rx, tx struct {
 		epoll *pollster
 		buf   []msg
@@ -48,12 +49,17 @@ func (*driver) Name() string {
 	return "can4linux"
 }
 
-func (*driver) Scan() (list []string) {
+func (*driver) Scan() (list []can.Name) {
 	for i := 0; i < 4; i++ {
 		n := strconv.Itoa(i)
-		if fi, err := os.Stat("/dev/can" + n); err == nil {
+		dev := "/dev/can" + n
+		if fi, err := os.Stat(dev); err == nil {
 			if fi.Mode()&os.ModeDevice != 0 {
-				list = append(list, n)
+				list = append(list, can.Name{
+					ID:     n,
+					Device: dev,
+					Driver: "can4linux",
+				})
 			}
 		}
 	}
@@ -66,7 +72,7 @@ func (drv *driver) Open(devName string, _ ...interface{}) (cd can.Device, err er
 	if devName == "" {
 		devName = "0"
 		if list := drv.Scan(); len(list) != 0 {
-			devName = list[0]
+			devName = list[0].ID
 		}
 	}
 	f, err := os.OpenFile("/dev/can"+devName, os.O_RDWR|syscall.O_NONBLOCK, 0)
@@ -90,9 +96,14 @@ func (drv *driver) Open(devName string, _ ...interface{}) (cd can.Device, err er
 	}
 	d.tx.buf = make([]msg, 1)
 
+	d.name = devName
 	d.cl = f
 	cd = d
 	return
+}
+
+func (d *dev) ID() string {
+	return "can4linux:" + d.name
 }
 
 func (d *dev) Read(buf []can.Msg) (n int, err error) {

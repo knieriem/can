@@ -6,6 +6,8 @@ package api
 
 import (
 	"fmt"
+	"log"
+	"strconv"
 	"syscall"
 	"unsafe"
 )
@@ -121,6 +123,23 @@ func (h Handle) InUse() (is bool) {
 	v, st := h.IntVal(ChanCondition)
 	if st == 0 && v == ChanOccupied {
 		is = true
+	}
+	return
+}
+
+func (h Handle) DisplayName() (name string) {
+	s, st := h.StringVal(HardwareName)
+	if st == 0 {
+		name = s
+	} else {
+		log.Println("DI", st)
+	}
+	i, st := h.IntVal(DeviceNumber)
+	if st == 0 {
+		if name != "" {
+			name += " "
+		}
+		name += "#" + strconv.Itoa(i)
 	}
 	return
 }

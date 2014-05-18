@@ -64,7 +64,7 @@ func (*driver) Name() string {
 	return "rpc"
 }
 
-func (*driver) Scan() (list []string) {
+func (*driver) Scan() (list []can.Name) {
 	return
 }
 
@@ -85,6 +85,10 @@ func (*driver) Open(addr string, _ ...interface{}) (cd can.Device, err error) {
 	d.Closer = cl
 	cd = d
 	return
+}
+
+func (d *device) ID() string {
+	return "pcan"
 }
 
 func (d *device) Read(buf []can.Msg) (n int, err error) {

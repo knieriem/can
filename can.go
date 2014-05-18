@@ -13,7 +13,7 @@ type Driver interface {
 	Name() string
 	//	Version() string
 	Open(name string, options ...interface{}) (Device, error)
-	Scan() []string
+	Scan() []Name
 }
 
 var drvlist []Driver
@@ -38,9 +38,40 @@ type Device interface {
 	// to the driver at once (if the driver is able to do that).
 	Write([]Msg) (n int, err error)
 
-	DriverVersion() string
+	ID() string
+	Name() Name
+	Version() Version
 
 	Close() error
+}
+
+type Name struct {
+	ID      string
+	Display string
+	Device  string
+	Driver  string
+}
+
+func (n *Name) String() string {
+	return n.Driver + ":" + n.ID
+}
+
+func (n *Name) Format(idSep, itemSep, end string) string {
+	var item []string
+	if n.Display != "" {
+		item = append(item, n.Display)
+	}
+	if n.Device != "" {
+		item = append(item, n.Device)
+	}
+	return n.String() + idSep + strings.Join(item, itemSep) + end
+}
+
+type Version struct {
+	Device    string
+	Driver    string
+	Api       string
+	SerialNum string
 }
 
 //
@@ -84,20 +115,14 @@ func Open(deviceName string, options ...string) (dev Device, err error) {
 	return
 }
 
-func Scan() (list []string) {
+func Scan() (list []Name) {
 	for _, drv := range drvlist {
-		name := drv.Name()
-		for _, s := range drv.Scan() {
-			if s == "" {
-				list = append(list, name)
-			} else {
-				list = append(list, name+":"+s)
-			}
-		}
+		list = append(list, drv.Scan()...)
 	}
 	return
 }
 
 type Unversioned struct{}
 
-func (Unversioned) DriverVersion() string { return "" }
+func (Unversioned) Name() Name       { return Name{} }
+func (Unversioned) Version() Version { return Version{} }

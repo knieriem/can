@@ -38,6 +38,20 @@ type dev struct {
 		*bufio.Writer
 	}
 	io.Closer
+	name string
+	addr string
+	can.Unversioned
+}
+
+func (d *dev) ID() string {
+	return "rnet:" + d.name
+}
+
+func (d *dev) Name() (n can.Name) {
+	n.ID = d.name
+	n.Device = d.addr
+	n.Driver = "rnet"
+	return
 }
 
 func init() {
@@ -53,10 +67,13 @@ func (*driver) Name() string {
 
 var unixsocket = mbox.Unsharp("#R/rudinet_sock")
 
-func (*driver) Scan() (list []string) {
+func (*driver) Scan() (list []can.Name) {
 	fi, err := os.Stat(unixsocket)
 	if err == nil && fi.Mode()&os.ModeSocket != 0 {
-		list = append(list, "")
+		list = append(list, can.Name{
+			Device: unixsocket,
+			Driver: "rnet",
+		})
 	}
 	return
 }
@@ -84,13 +101,15 @@ func newDev(conn io.ReadWriter, c io.Closer) (d *dev) {
 	return
 }
 
-func (*driver) Open(devName string, _ ...interface{}) (cd can.Device, err error) {
+func (*driver) Open(devName string, _ ...interface{}) (d can.Device, err error) {
 	var conn net.Conn
+	var addr string
 
 	if devName == "" {
 		conn, err = net.Dial("unix", unixsocket)
+		addr = unixsocket
 	} else {
-		addr := devName
+		addr = devName
 		host, _, e := net.SplitHostPort(addr)
 		if e != nil {
 			host = addr
@@ -106,13 +125,16 @@ func (*driver) Open(devName string, _ ...interface{}) (cd can.Device, err error)
 	if err != nil {
 		return
 	}
-	cd = newDev(conn, conn)
+	cd := newDev(conn, conn)
+	cd.name = devName
+	cd.addr = addr
 
 	var c ctlMsg
 	c.Client.Present |= ctlClientOmniReader | ctlClientOmniWriter
 	c.Client.Flags = c.Client.Present
 	c.WriteTo(conn)
 
+	d = cd
 	return
 }
 
@@ -179,8 +201,6 @@ func (d *dev) WriteMsg(m *can.Msg) (err error) {
 	d.tx.Flush()
 	return
 }
-
-func (*dev) DriverVersion() string { return "" }
 
 const (
 	hdrNoTimestamp = 0x20 + iota

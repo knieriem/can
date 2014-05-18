@@ -51,3 +51,5 @@ func (d *pipeDev) Close() (err error) {
 	close(d.w)
 	return
 }
+
+func (d *pipeDev) ID() string { return "pipe" }

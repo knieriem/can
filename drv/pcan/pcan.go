@@ -199,3 +199,7 @@ func wrapErr(fnName string, pErr *error) {
 func (b *bus) nChan() int {
 	return len(b.channels)
 }
+
+func (d *dev) ID() string {
+	return "pcan:" + d.name.ID
+}

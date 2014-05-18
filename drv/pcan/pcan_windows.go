@@ -94,6 +94,7 @@ var hwList = busList{
 }
 
 type dev struct {
+	name    can.Name
 	h       api.Handle
 	bus     *bus
 	receive struct {
@@ -104,14 +105,21 @@ type dev struct {
 	}
 }
 
-func (*driver) Scan() (list []string) {
+func (*driver) Scan() (list []can.Name) {
 	for _, bus := range hwList {
 		if !bus.pnp {
 			continue
 		}
 		for i, ch := range bus.channels {
 			if ch.Available() {
-				list = append(list, bus.name+strconv.Itoa(i+1))
+				ch.Initialize(api.Baud500K, 0, 0, 0)
+				disp := ch.DisplayName()
+				ch.Uninitialize()
+				list = append(list, can.Name{
+					ID:      bus.name + strconv.Itoa(i+1),
+					Display: disp,
+					Driver:  "pcan",
+				})
 			}
 		}
 	}
@@ -158,17 +166,18 @@ func (*driver) Open(devName string, options ...interface{}) (cd can.Device, err 
 	}
 
 	d.h = h
-	d.bus = b
+	d.name = can.Name{
+		ID:      b.name + strconv.Itoa(i+1),
+		Driver:  "pcan",
+		Display: h.DisplayName(),
+	}
 
-	//	name, st := h.StringVal(api.HardwareName)
-	//	num, st := h.IntVal(api.DeviceNumber)
-	//	log.Println("DEV", d.Name(), name, num, st)
 	cd = d
 	return
 }
 
-func (d *dev) Name() string {
-	return d.bus.name + strconv.Itoa(int(d.h-d.bus.channels[0]+1))
+func (d *dev) Name() can.Name {
+	return d.name
 }
 
 func (d *dev) Read(buf []can.Msg) (n int, err error) {
@@ -291,11 +300,7 @@ func (d *dev) Close() (err error) {
 	return
 }
 
-func (d *dev) DriverVersion() (ver string) {
-	chanVer, st := d.h.StringVal(api.ChanVersion)
-	if st == api.OK {
-		ver += chanVer
-	}
+func (d *dev) Version() (v can.Version) {
 	apiVer, st := d.h.StringVal(api.ApiVersion)
 	if st == api.OK {
 		f := strings.FieldsFunc(apiVer, func(r rune) bool {
@@ -305,7 +310,11 @@ func (d *dev) DriverVersion() (ver string) {
 			}
 			return false
 		})
-		ver += "\nAPI: " + strings.Join(f, ".")
+		v.Api = strings.Join(f, ".")
+	}
+	chanVer, st := d.h.StringVal(api.ChanVersion)
+	if st == api.OK {
+		v.Device = chanVer
 	}
 	return
 }
