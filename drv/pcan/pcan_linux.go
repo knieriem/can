@@ -14,6 +14,10 @@ import (
 	"can/drv/pcan/api"
 )
 
+func driverPresent() bool {
+	return true
+}
+
 type bus struct {
 	name     string
 	channels []channel

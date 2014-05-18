@@ -7,6 +7,7 @@ package pcan
 import (
 	"errors"
 	"io"
+	"os/exec"
 	"strconv"
 	"strings"
 	"syscall"
@@ -16,6 +17,11 @@ import (
 	"can/drv/pcan/api"
 	win "github.com/knieriem/g/syscall"
 )
+
+func driverPresent() bool {
+	_, err := exec.LookPath("PCANBasic.dll")
+	return err == nil
+}
 
 type bus struct {
 	name     string

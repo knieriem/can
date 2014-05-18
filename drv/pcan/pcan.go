@@ -36,7 +36,9 @@ var builtinBitrates = map[can.Bitrate]uint16{
 }
 
 func init() {
-	can.RegisterDriver(new(driver))
+	if driverPresent() {
+		can.RegisterDriver(new(driver))
+	}
 }
 
 type driver struct {
