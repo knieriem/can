@@ -8,7 +8,9 @@ import (
 	"errors"
 	"io"
 	"os"
+	"runtime"
 	"strconv"
+	"syscall"
 
 	"can"
 	"can/drv/pcan/api"
@@ -111,6 +113,9 @@ func (*driver) Open(devName string, options ...interface{}) (cd can.Device, err 
 	i.UcCANMsgType = api.MsgExtended
 	err = d.h.Init(&i)
 	if err != nil {
+		if runtime.GOARCH == "386" && err == syscall.EINVAL {
+			err = errors.New("32-bit program / 64-bit driver mismatch")
+		}
 		return
 	}
 
