@@ -14,13 +14,14 @@ import (
 	"syscall"
 
 	"can"
+	"github.com/knieriem/g/syscall/epoll"
 )
 
 type dev struct {
 	fd     int
 	name   string
 	rx, tx struct {
-		epoll *pollster
+		epoll *epoll.Pollster
 		buf   []msg
 	}
 	cl io.Closer
@@ -81,14 +82,14 @@ func (drv *driver) Open(devName string, _ ...interface{}) (cd can.Device, err er
 	}
 	d.fd = int(f.Fd())
 
-	if d.rx.epoll, err = newpollster(); err != nil {
+	if d.rx.epoll, err = epoll.NewPollster(); err != nil {
 		return
 	}
 	if _, err = d.rx.epoll.AddFD(d.fd, 'r', true); err != nil {
 		return
 	}
 
-	if d.tx.epoll, err = newpollster(); err != nil {
+	if d.tx.epoll, err = epoll.NewPollster(); err != nil {
 		return
 	}
 	if _, err = d.tx.epoll.AddFD(d.fd, 'w', true); err != nil {
