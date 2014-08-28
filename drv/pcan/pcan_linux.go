@@ -14,6 +14,7 @@ import (
 
 	"can"
 	"can/drv/pcan/api"
+	"github.com/knieriem/g/syscall/epoll"
 )
 
 func driverPresent() bool {
@@ -65,6 +66,7 @@ type dev struct {
 	h       api.Fd
 	name    can.Name
 	receive struct {
+		epoll  *epoll.Pollster
 		status api.Status
 		t0     can.Time
 		t0val  int64
@@ -119,6 +121,12 @@ func (*driver) Open(devName string, options ...interface{}) (cd can.Device, err 
 		return
 	}
 
+	if d.receive.epoll, err = epoll.NewPollster(); err != nil {
+		return
+	}
+	if d.receive.epoll.AddFD(int(d.h), 'r', true); err != nil {
+		return
+	}
 	d.h.SetMsgFilter(nil)
 
 	cd = d
@@ -139,6 +147,15 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 	for n < len(buf) {
 		if n > 0 && d.h.Status().Test(api.ErrQRCVEMPTY) {
 			return
+		}
+		_, mode, err1 := d.receive.epoll.WaitFD(1e9)
+		if err1 != nil {
+			err = err1
+			return
+		}
+		if mode == 0 {
+			// WaitFD timeout
+			continue
 		}
 		err = d.h.ReadMsg(&m)
 		if err != nil {
@@ -180,6 +197,7 @@ func (d *dev) WriteMsg(cm *can.Msg) (err error) {
 }
 
 func (d *dev) Close() (err error) {
+	d.receive.epoll.Close()
 	err = d.file.Close()
 	wrapErr("close", &err)
 	return
