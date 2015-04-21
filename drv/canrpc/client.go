@@ -88,7 +88,7 @@ func (*driver) Open(addr string, _ ...interface{}) (cd can.Device, err error) {
 }
 
 func (d *device) ID() string {
-	return "pcan"
+	return "rpc"
 }
 
 func (d *device) Read(buf []can.Msg) (n int, err error) {
