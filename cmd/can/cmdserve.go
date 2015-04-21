@@ -6,7 +6,7 @@ package main
 
 import (
 	"io"
-	"log"
+	"fmt"
 	"net"
 	"net/rpc"
 
@@ -21,6 +21,8 @@ var cmdServe = &Command{
 	UsageLine: "serve [-t] addr [device]",
 	Short:     "serve a CAN device on a tcp port",
 	Long:      ``,
+	ExtraArgsReq:	1,
+	ExtraArgsMax:	2,
 }
 
 func init() {
@@ -28,25 +30,21 @@ func init() {
 	cmdServe.Run = runServe
 }
 
-func runServe(cmd *Command, w io.Writer, args []string) {
-	if len(args) < 1 {
-		usage()
-	}
-
+func runServe(cmd *Command, w io.Writer, args []string) (err error) {
 	devName := ""
 	if len(args) > 1 {
 		devName = args[1]
 	}
 	d, err := can.Open(devName)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	err = canrpc.Register(rpc.DefaultServer, d, "")
 	l, err := net.Listen("tcp", args[0])
 	if err != nil {
 		return
 	}
-	log.Println("Listening on", l.Addr(), "...")
+	fmt.Println("Listening on", l.Addr(), "...")
 	rpc.Accept(l)
 	return
 }
