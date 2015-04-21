@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-const pattern = `*n -type- ndev`
+const pattern = `*n -type-`
 
 func parseProcfile() (list busList, err error) {
 	var index = make(map[string][]channel, 5)
