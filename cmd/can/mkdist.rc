@@ -4,12 +4,6 @@ dir = can
 
 flag e +
 
-fn rebuildnonstdpkg{
-	go list -f '{{if not .Standard}}go install -v {{.ImportPath}}{{end}}' $*
-}
-fn rebuildimports{
-	go list -f 'rebuildnonstdpkg {{range .Imports}} {{.}}{{end}}' |  rc
-}
 fn build{
 	os=$1
 	arch=$2
@@ -17,8 +11,7 @@ fn build{
 	d=$dir/$os^_$arch
 	mkdir -p $d
 
-	GOOS=$os GOARCH=$arch rebuildimports | rc
-	GOOS=$os GOARCH=$arch go build -o $d/can$3
+	GOOS=$os GOARCH=$arch go build -v -i -o $d/can$3
 }
 
 rm -rf $dir
@@ -33,7 +26,7 @@ cp $pcanapi/windows/386/PCANBasic.dll $dir/windows_386/
 cp $pcanapi/windows/amd64/PCANBasic.dll $dir/windows_amd64/
 
 9 date > $dir/DATE
-grep '^const version' main.go | sed 's,"$,,;s,.*",,' > $dir/VERSION
+grep 'can.version' can.go | sed 's,.*can version ,,;s,".*,,' > $dir/VERSION
 
 vdir=$dir-`{cat $dir/VERSION}
 rm $dir/VERSION
