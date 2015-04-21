@@ -78,6 +78,7 @@ func (c *Command) Runnable() bool {
 // The order here is the order in which they are printed by 'go help'.
 var commands = []*Command{
 	cmdVersion,
+	cmdLsDev,
 	cmdServe,
 }
 
