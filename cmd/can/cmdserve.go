@@ -5,8 +5,8 @@
 package main
 
 import (
-	"io"
 	"fmt"
+	"io"
 	"net"
 	"net/rpc"
 
@@ -18,11 +18,11 @@ import (
 )
 
 var cmdServe = &Command{
-	UsageLine: "serve [-t] addr [device]",
-	Short:     "serve a CAN device on a tcp port",
-	Long:      ``,
-	ExtraArgsReq:	1,
-	ExtraArgsMax:	2,
+	UsageLine:    "serve [-t] addr [device]",
+	Short:        "serve a CAN device on a tcp port",
+	Long:         ``,
+	ExtraArgsReq: 1,
+	ExtraArgsMax: 2,
 }
 
 func init() {
