@@ -64,7 +64,11 @@ func (n *Name) Format(idSep, itemSep, end string) string {
 	if n.Device != "" {
 		item = append(item, n.Device)
 	}
-	return n.String() + idSep + strings.Join(item, itemSep) + end
+	s := ""
+	if idSep != "<OMIT ID>" {
+		s += n.String() + idSep
+	}
+	return s + strings.Join(item, itemSep) + end
 }
 
 type Version struct {
