@@ -5,9 +5,14 @@
 package can
 
 import (
-	"errors"
 	"strings"
 )
+
+type Error string
+
+func (e Error) Error() string {
+	return "can: " + string(e)
+}
 
 type Driver interface {
 	Name() string
@@ -102,7 +107,7 @@ func Open(deviceName string, options ...string) (dev Device, err error) {
 				return
 			}
 		}
-		err = errors.New("no device found")
+		err = Error("no device found")
 		return
 	}
 
@@ -115,7 +120,7 @@ func Open(deviceName string, options ...string) (dev Device, err error) {
 			return drv.Open(name, optList...)
 		}
 	}
-	err = errors.New("driver not found: " + drvName)
+	err = Error("driver not found: " + drvName)
 	return
 }
 

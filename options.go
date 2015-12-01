@@ -1,7 +1,6 @@
 package can
 
 import (
-	"errors"
 	"strconv"
 )
 
@@ -13,7 +12,7 @@ type (
 func parseOptions(optFields []string) (list []interface{}, err error) {
 	for _, s := range optFields {
 		if s == "" {
-			err = errors.New("empty option")
+			err = Error("empty option")
 			return
 		}
 		var opt interface{}
