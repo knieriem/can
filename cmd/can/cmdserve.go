@@ -15,9 +15,11 @@ import (
 	"can/drv/canrpc"
 	_ "can/drv/pcan"
 	_ "can/drv/rnet"
+
+	"tool"
 )
 
-var cmdServe = &Command{
+var cmdServe = &tool.Command{
 	UsageLine:    "serve [-t] addr [device]",
 	Short:        "serve a CAN device on a tcp port",
 	Long:         ``,
@@ -30,7 +32,7 @@ func init() {
 	cmdServe.Run = runServe
 }
 
-func runServe(cmd *Command, w io.Writer, args []string) (err error) {
+func runServe(cmd *tool.Command, w io.Writer, args []string) (err error) {
 	devName := ""
 	if len(args) > 1 {
 		devName = args[1]
