@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/can"
+	"github.com/knieriem/can"
 	"github.com/knieriem/can/drv/pcan/api"
 	win "github.com/knieriem/g/syscall"
 )
