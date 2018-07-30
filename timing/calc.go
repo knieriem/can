@@ -1,5 +1,9 @@
 package timing
 
+import (
+	"github.com/knieriem/can"
+)
+
 const (
 	tq        = 1
 	minPhSeg2 = 2 * tq

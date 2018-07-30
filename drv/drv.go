@@ -5,7 +5,7 @@
 // A helper package for the various CAN driver interface packages.
 package drv
 
-import "can"
+import "github.com/knieriem/can"
 
 type FlagsMap []struct {
 	Pkg can.Flags // a flag as defined by this package

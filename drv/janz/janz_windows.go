@@ -15,9 +15,9 @@ import (
 	"time"
 	"unsafe"
 
-	"can"
-	"can/drv"
-	"can/drv/janz/pcan"
+	"github.com/knieriem/can"
+	"github.com/knieriem/can/drv"
+	"github.com/knieriem/can/drv/janz/pcan"
 )
 
 var d *driver

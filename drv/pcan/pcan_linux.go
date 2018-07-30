@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"syscall"
 
-	"can"
-	"can/drv/pcan/api"
+	"github.com/knieriem/can"
+	"github.com/knieriem/can/drv/pcan/api"
 	"github.com/knieriem/g/syscall/epoll"
 )
 

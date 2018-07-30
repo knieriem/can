@@ -27,7 +27,7 @@ import (
 	"strings"
 	"sync"
 
-	"can"
+	"github.com/knieriem/can"
 )
 
 // Satisfied by any object that has a Call method as described,

@@ -10,13 +10,12 @@ import (
 	"net"
 	"net/rpc"
 
-	"can"
-	_ "can/drv/can4linux"
-	"can/drv/canrpc"
-	_ "can/drv/pcan"
-	_ "can/drv/rnet"
+	"github.com/knieriem/can"
+	_ "github.com/knieriem/can/drv/can4linux"
+	"github.com/knieriem/can/drv/canrpc"
+	_ "github.com/knieriem/can/drv/pcan"
 
-	"tool"
+	"github.com/knieriem/tool"
 )
 
 var cmdServe = &tool.Command{

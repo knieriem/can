@@ -9,9 +9,9 @@ import (
 	"errors"
 	"strconv"
 
-	"can"
-	"can/drv"
-	api "can/drv/pcan/api"
+	"github.com/knieriem/can"
+	"github.com/knieriem/can/drv"
+	api "github.com/knieriem/can/drv/pcan/api"
 )
 
 const (

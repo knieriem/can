@@ -7,7 +7,7 @@ package canrpc
 import (
 	"io"
 
-	"can"
+	"github.com/knieriem/can"
 )
 
 type object struct {

@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"can"
+	"github.com/knieriem/can"
 	"github.com/knieriem/g/syscall/epoll"
 )
 

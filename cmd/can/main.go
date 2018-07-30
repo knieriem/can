@@ -1,7 +1,7 @@
 package main
 
 import (
-	"tool"
+	"github.com/knieriem/tool"
 )
 
 func main() {

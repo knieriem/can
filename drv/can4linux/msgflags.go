@@ -5,8 +5,8 @@
 package can4linux
 
 import (
-	"can"
-	"can/drv"
+	"github.com/knieriem/can"
+	"github.com/knieriem/can/drv"
 )
 
 const (

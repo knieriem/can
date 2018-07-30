@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 
-	"can"
-	"tool"
+	"github.com/knieriem/can"
+	"github.com/knieriem/tool"
 )
 
 var cmdLsDev = &tool.Command{

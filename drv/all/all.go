@@ -2,8 +2,7 @@
 package all
 
 import (
-	_ "can/drv/can4linux"
-	_ "can/drv/canrpc"
-	_ "can/drv/pcan"
-	_ "can/drv/rnet"
+	_ "github.com/knieriem/can/drv/can4linux"
+	_ "github.com/knieriem/can/drv/canrpc"
+	_ "github.com/knieriem/can/drv/pcan"
 )
