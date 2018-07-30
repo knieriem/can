@@ -69,7 +69,7 @@ func FitSamplePoint(fOsc, bitRate uint32, spLoc float32, maxSJW uint) (t *BitTim
 		}
 	}
 	if bestTiming.PhaseSeg2 == 0 {
-		err = Error("unable to calculate a bit timing")
+		err = can.Error("unable to calculate a bit timing")
 	} else {
 		t = &bestTiming
 		sjw := t.PhaseSeg1
