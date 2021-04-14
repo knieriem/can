@@ -61,6 +61,7 @@ func parseProcfile() (list busList, err error) {
 
 	list = []*bus{
 		{"usb", nil},
+		{"usbfd", nil},
 		{"pci", nil},
 		{"pcc", nil},
 		{"dng", nil},
