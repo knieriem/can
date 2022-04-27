@@ -42,6 +42,10 @@ func (b *bus) canAutoDetect() bool {
 	return true
 }
 
+func (b *bus) sysName(minor int) string {
+	return "/dev/pcan" + b.name + strconv.Itoa(minor)
+}
+
 func (*driver) Scan() (list []can.Name) {
 
 	buses, err := parseProcfile()
@@ -54,7 +58,7 @@ func (*driver) Scan() (list []can.Name) {
 			list = append(list, can.Name{
 				ID:     b.name + strconv.Itoa(i+1),
 				Driver: "pcan",
-				Device: "/dev/pcan" + strconv.Itoa(ch.minor),
+				Device: b.sysName(ch.minor),
 			})
 		}
 	}
@@ -91,7 +95,7 @@ func (*driver) Open(devName string, options ...interface{}) (cd can.Device, err 
 		return
 	}
 
-	sysName := "/dev/pcan" + strconv.Itoa(ch.minor)
+	sysName := bus.sysName(ch.minor)
 	f, err := os.OpenFile(sysName, os.O_RDWR, 0)
 	if err != nil {
 		return
