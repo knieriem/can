@@ -15,7 +15,13 @@ $2 ~ /TYPE_/ { type = "HwType"}
 
 /PCAN-.* interface, channel/ {sub("PCAN-", "", $5)}
 
+proc && /Deprecated/ { next }
+
 proc && /#define/{
+	if ($0 ~ "__T\\(") {
+		sub("__T\\(\"", "\"")
+		sub("\"\\)","\"")
+	}
 	sub("NONEBUS", "NoneBus")
 	gsub("PARAMETER", "PARAM")
 	gsub("PCAN_", "")
@@ -43,6 +49,14 @@ proc && /#define/{
 	if (ltype)
 		$2 = $2 " " ltype
 	sub("$", " = ", $2)
+	if ($3 ~ "0x.*U") {
+		sub("U$", "", $3)
+	}
+		if ($3 ~ /.*CHANNEL_.*/) {
+			gsub("CHANNEL_", "Chan", $0)
+			gsub("AVAILABLE", "Available", $0)
+			gsub("OCCUPIED", "Occupied", $0)
+		}
 	print
 }
 

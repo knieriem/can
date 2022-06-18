@@ -140,7 +140,7 @@ func (*driver) Open(devName string, options ...interface{}) (cd can.Device, err 
 		return
 	}
 
-	if h.InUse() {
+	if h.InUse() && !h.Available() {
 		err = errors.New("channel in use")
 		return
 	}

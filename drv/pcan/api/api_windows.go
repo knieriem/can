@@ -134,7 +134,7 @@ func (h Handle) DisplayName() (name string) {
 	} else {
 		log.Println("DI", st)
 	}
-	i, st := h.IntVal(DeviceNumber)
+	i, st := h.IntVal(DeviceId)
 	if st == 0 {
 		if name != "" {
 			name += " "
