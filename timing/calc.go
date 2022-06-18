@@ -60,7 +60,7 @@ func FitSamplePoint(fOsc, bitRate uint32, spLoc float32, maxSJW uint) (t *BitTim
 		}
 
 		errLoc := abs((1+int(tseg1))*1000/int(nq) - int(spLoc*1000))
-		if errLoc > minErrLoc {
+		if errLoc >= minErrLoc {
 			continue
 		}
 		minErrLoc = errLoc
