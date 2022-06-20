@@ -5,6 +5,7 @@
 package can
 
 import (
+	"errors"
 	"strings"
 )
 
@@ -24,6 +25,9 @@ type Driver interface {
 var drvlist []Driver
 
 func RegisterDriver(drv Driver) {
+	if drv == UnsupportedDriver {
+		return
+	}
 	drvlist = append(drvlist, drv)
 }
 
@@ -135,3 +139,13 @@ type Unversioned struct{}
 
 func (Unversioned) Name() Name       { return Name{} }
 func (Unversioned) Version() Version { return Version{} }
+
+var UnsupportedDriver Driver = unsupported{}
+
+type unsupported struct{}
+
+func (unsupported) Name() string { return "unsupported" }
+func (unsupported) Open(name string, options ...interface{}) (Device, error) {
+	return nil, errors.New("not supported")
+}
+func (unsupported) Scan() []Name { return nil }
