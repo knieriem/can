@@ -7,8 +7,13 @@ Currently, reading and writing of CAN and CAN FD messages is supported.
 It is also possible to get a list of CAN interfaces present on a system. This is done
 using the kernel's [Netlink] interface, with help of [github.com/mdlayher/netlink].
 
-Interface configuration will be added later;
-currently it still must be done using tools like `ip`.
+Interface configuration will be added later in a generic way;
+currently it still must be done using a tool like `ip`,
+for example:
+
+```sh
+ip link set can0 up type can bitrate 500000
+```
 
 ## Usage
 
