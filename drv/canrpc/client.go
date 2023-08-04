@@ -108,7 +108,9 @@ func (d *device) Write(buf []can.Msg) (n int, err error) {
 	return
 }
 func (d *device) WriteMsg(m *can.Msg) (err error) {
-	err = d.call("WriteMsg", m, nil)
+	var w WireMsg
+	w.encode(m)
+	err = d.call("WriteMsg", w, nil)
 	return
 }
 

@@ -163,21 +163,23 @@ func (d *dev) decode(dst *can.Msg, m *api.Msg, µs int64) (st api.Status) {
 		dst.Flags = errFlagsMap.Decode(int(st))
 		dst.Flags |= can.StatusMsg
 		dst.Id = 0
-		dst.Len = 0
+		dst.SetData(nil)
 		return
 	}
 	dst.Id = m.ID
 	dst.Flags = msgFlagsMap.Decode(int(m.MSGTYPE))
-	dst.Len = int(m.LEN)
-	copy(dst.Data[:], m.DATA[:dst.Len])
+	data := dst.Data()[:m.LEN]
+	copy(data, m.DATA[:])
+	dst.SetData(data)
 	return
 }
 
 func encode(dst *api.Msg, src *can.Msg) {
 	dst.ID = src.Id
-	dst.LEN = byte(src.Len)
+	data := src.Data()
+	dst.LEN = uint8(len(data))
 	dst.MSGTYPE = byte(msgFlagsMap.Encode(src.Flags))
-	copy(dst.DATA[:src.Len], src.Data[:src.Len])
+	copy(dst.DATA[:], data)
 }
 
 type wrappedError struct {

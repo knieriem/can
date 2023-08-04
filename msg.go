@@ -41,8 +41,11 @@ func (f Flags) Test(t Flags) bool {
 type Msg struct {
 	Id uint32 // The CAN message identifier
 	Flags
-	Len  int
-	Data [8]byte
+
+	// data contains the payload of the CAN message.
+	// It can be accessed through Data() and SetData()
+	data       []byte
+	stdPayload [8]byte
 
 	Tx struct {
 		Delayµs int // The driver shall delay this message.
@@ -50,4 +53,26 @@ type Msg struct {
 	Rx struct {
 		Time Time // Timestamp
 	}
+}
+
+// Data returns the current Payload of the message.
+// If no payload buffer has been set by calling SetData before,
+// Data returns a byte slice with the standard payload length 8.
+func (m *Msg) Data() []byte {
+	if m.data == nil {
+		return m.stdPayload[:0]
+	}
+	return m.data
+}
+
+// SetData updates the payload of the message.
+func (m *Msg) SetData(b []byte) {
+	m.data = b
+}
+
+// Reset sets the message back to the initial state.
+func (m *Msg) Reset() {
+	m.Id = 0
+	m.Flags = 0
+	m.data = m.data[:0]
 }
