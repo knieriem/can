@@ -5,6 +5,8 @@ package socketcan
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
+	"io"
 
 	"github.com/knieriem/can"
 	"github.com/knieriem/can/drv/socketcan/internal/linux"
@@ -83,7 +85,7 @@ func (f *frame) encode(msg *can.Msg, mtu int) (nw int, err error) {
 	return nw, nil
 }
 
-func (f *frame) decode(msg *can.Msg, n int) error {
+func (f *frame) decode(msg *can.Msg) error {
 	id := f.id()
 	msg.Reset()
 	if (id & linux.CAN_ERR_FLAG) != 0 {
@@ -114,13 +116,26 @@ func (f *frame) decode(msg *can.Msg, n int) error {
 		return nil
 	}
 	data := msg.Data()
-	n = f.len()
+	n := f.len()
 	if cap(data) < n {
 		return can.ErrMsgCapExceeded
 	}
 	data = data[:n]
 	msg.SetData(data)
 	copy(data, f.data())
+	return nil
+}
+
+func (f *frame) readFromN(r io.Reader, n int) error {
+	n, err := r.Read(f.b[:n])
+	if err != nil {
+		return err
+	}
+
+	// check for frame integrity
+	if n < dataOffset || dataOffset+f.len() > n {
+		return fmt.Errorf("unexpected short read: %d bytes", n)
+	}
 	return nil
 }
 

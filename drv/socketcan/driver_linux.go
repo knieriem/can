@@ -168,11 +168,11 @@ func setupInfo(info *can.Name, link *netlink.Link) {
 
 func (d *dev) Read(buf []can.Msg) (n int, err error) {
 	f := d.recvBuf
-	n, err = d.file.Read(f.b[:d.mtu])
+	err = f.readFromN(d.file, d.mtu)
 	if err != nil {
 		return 0, wrapErr("read", err)
 	}
-	err = f.decode(&buf[0], n)
+	err = f.decode(&buf[0])
 	if err != nil {
 		return 0, err
 	}
