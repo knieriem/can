@@ -5,7 +5,8 @@ Package *socketcan* implements a can.Driver for [SocketCAN] on `linux/{amd64,arm
 Currently, reading and writing of CAN and CAN FD messages is supported.
 
 It is also possible to get a list of CAN interfaces present on a system. This is done
-using the kernel's [Netlink] interface, with help of [github.com/mdlayher/netlink].
+using the kernel's [Netlink] interface, with help of [github.com/mdlayher/netlink]
+and [github.com/jsimonetti/rtnetlink].
 
 Interface configuration will be added later in a generic way;
 currently it still must be done using a tool like `ip`,
@@ -37,3 +38,4 @@ func main() {
 [SocketCAN]: https://docs.kernel.org/networking/can.html
 [Netlink]: https://en.wikipedia.org/wiki/Netlink
 [github.com/mdlayher/netlink]: https://github.com/mdlayher/netlink
+[github.com/jsimonetti/rtnetlink]: https://github.com/jsimonetti/rtnetlink
