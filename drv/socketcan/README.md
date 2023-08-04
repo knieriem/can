@@ -1,6 +1,6 @@
 # socketcan
 
-Package *socketcan* implements a can.Driver for [SocketCAN] on Linux.
+Package *socketcan* implements a can.Driver for [SocketCAN] on `linux/{amd64,arm,arm64}`.
 
 Currently, reading and writing of CAN and CAN FD messages is supported.
 
