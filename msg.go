@@ -4,6 +4,8 @@
 
 package can
 
+import "errors"
+
 // Message Flags.
 type Flags int
 
@@ -76,3 +78,26 @@ func (m *Msg) Reset() {
 	m.Flags = 0
 	m.data = m.data[:0]
 }
+
+var ValidFDSizes = []int{12, 16, 20, 24, 36, 48, 64}
+
+func VerifyDataLenFD(n int) (next int, needsFD bool, err error) {
+	if n <= 8 {
+		return n, false, nil
+	}
+
+	needsFD = true
+	for _, nFD := range ValidFDSizes {
+		if n == nFD {
+			return n, needsFD, nil
+		}
+		if n < nFD {
+			return nFD, needsFD, ErrInvalidMsgLen
+		}
+	}
+	return 0, needsFD, ErrInvalidMsgLen
+}
+
+var ErrInvalidMsgLen = errors.New("invalid message length")
+
+var ErrMsgCapExceeded = errors.New("message capacity too small")
