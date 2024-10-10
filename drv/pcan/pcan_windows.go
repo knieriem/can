@@ -20,6 +20,11 @@ import (
 
 func driverPresent() bool {
 	_, err := exec.LookPath("PCANBasic.dll")
+	if err != nil {
+		if errors.Is(err, exec.ErrDot) {
+			err = nil
+		}
+	}
 	return err == nil
 }
 
