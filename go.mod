@@ -1,5 +1,7 @@
 module github.com/knieriem/can
 
+go 1.21
+
 require (
 	github.com/knieriem/g v0.1.0
 	github.com/knieriem/text v0.1.0 // indirect

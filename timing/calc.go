@@ -5,44 +5,90 @@ import (
 )
 
 const (
-	tq        = 1
-	minPhSeg2 = 2 * tq
-	maxPhSeg2 = 8 * tq
-	maxPhSeg1 = 8 * tq
-	maxTSeg1  = maxProp + maxPhSeg1
-	maxProp   = 8 * tq
-	syncSeg   = 1 * tq
+	tq      = 1
+	syncSeg = 1 * tq
 )
 
-// Calculate a CANopen bit timing for a given oscillator frequency
-// and the desired bitrate.
-func CanOpen(fOsc, bitRate uint32) (*BitTiming, error) {
-	return FitSamplePoint(fOsc, bitRate, .875, 1)
+// SamplePoint defines the position within a bit, where the
+// signal is read by a CAN node. The unit is 0.1 %.
+// The zero value is replaced by 875 (87.5 %) during calculations.
+type SamplePoint int
+
+func calcSamplePoint(tseg1, nq int) SamplePoint {
+	return SamplePoint(((1+tseg1)*1000 + nq/2) / nq)
 }
 
-// Calculate a bit timing with a desired location of the
+func (sp *SamplePoint) setupLazy(bitrate uint32) {
+	if *sp == 0 {
+		*sp = 875
+	}
+}
+
+func (sp SamplePoint) phSeg2(nq int) int {
+	return ((1000-int(sp))*nq + 500) / 1000
+}
+
+type CalcOption func(*calcConf)
+
+type calcConf struct {
+	preferLowerPrescaler bool
+	alignPhSeg1PhSeg2    bool
+}
+
+func PreferLowerPrescaler() CalcOption {
+	return func(conf *calcConf) {
+		conf.preferLowerPrescaler = true
+	}
+}
+
+func AlignPhSeg1PhSeg2() CalcOption {
+	return func(conf *calcConf) {
+		conf.alignPhSeg1PhSeg2 = true
+	}
+}
+
+// CalcBitTiming calculates a bit timing with the desired location of the
 // sample point for the given oscillator frequency and bitrate.
-func FitSamplePoint(fOsc, bitRate uint32, spLoc float32, maxSJW uint) (t *BitTiming, err error) {
+// Zero values may be used for the sample point and
+// for the resynchronization jump width (sjw),
+// in which case sp=87.5 % and sjw=1 are substituted.
+func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, sjw int, dev *DevSpec, opts ...CalcOption) (t *BitTiming, err error) {
+	var conf calcConf
+
+	for _, o := range opts {
+		o(&conf)
+	}
 	var minErrLoc = 1 << 16
 	var bestTiming BitTiming
+	nqMax := dev.NqMax()
 
-	for preSc := uint32(1); preSc < 64; preSc++ {
-		nq := int(fOsc / bitRate / preSc)
-		if fOsc/bitRate%preSc != 0 {
+	incr := minVal(dev.PrescalerIncr)
+
+	nq0 := fOsc / bitrate
+	if dev.FOscDiv != 0 {
+		nq0 /= uint32(dev.FOscDiv)
+	}
+
+	sjw = max(sjw, 1)
+	sp.setupLazy(bitrate)
+
+	for preSc := minVal(dev.PrescalerMin); preSc < dev.PrescalerMax; preSc += incr {
+		nq := int(nq0 / uint32(preSc))
+		if nq0%uint32(preSc) != 0 {
 			continue
 		}
 		if nq <= 0 {
 			break
 		}
-		if nq > 25 {
+		if nq > nqMax {
 			continue
 		}
-		ps2 := calcPhSeg2BySampleLoc(nq, spLoc)
+		ps2 := dev.constrainPhSeg2(sp.phSeg2(nq))
 	again:
 		// compute a tseg1
 		tseg1 := nq - ps2 - syncSeg
-		if tseg1 > maxTSeg1 {
-			if ps2 >= maxPhSeg2 {
+		if tseg1 > dev.TSeg1Max {
+			if ps2 >= dev.TSeg2Max {
 				continue
 			}
 			ps2++
@@ -53,40 +99,38 @@ func FitSamplePoint(fOsc, bitRate uint32, spLoc float32, maxSJW uint) (t *BitTim
 			break
 		}
 
-		// split tseg1, start with phSeg1 one less than phSeg2
-		prop, ps1 := splitTSeg1(tseg1, ps2-1)
-		if ps1 > maxPhSeg1 { // should never be true
+		errLoc := abs(int(calcSamplePoint(tseg1, nq) - sp))
+		if errLoc > minErrLoc {
 			continue
 		}
-
-		errLoc := abs((1+int(tseg1))*1000/int(nq) - int(spLoc*1000))
-		if errLoc >= minErrLoc {
-			continue
+		if conf.preferLowerPrescaler {
+			if errLoc == minErrLoc {
+				continue
+			}
 		}
 		minErrLoc = errLoc
 
+		ps1 := (tseg1 + 1) / 2
+		if conf.alignPhSeg1PhSeg2 {
+			ps1 = ps2 - 1
+		}
+		prop, ps1 := dev.SplitTSeg1(tseg1, ps1)
+
 		bestTiming = BitTiming{
-			Prescaler: uint(preSc),
-			PhaseSeg1: uint(ps1),
-			PhaseSeg2: uint(ps2),
-			PropSeg:   uint(prop),
+			Prescaler: preSc,
+			PropSeg:   prop,
+			PhaseSeg1: ps1,
+			PhaseSeg2: ps2,
 		}
 	}
+
 	if bestTiming.PhaseSeg2 == 0 {
-		err = can.Error("unable to calculate a bit timing")
-	} else {
-		t = &bestTiming
-		sjw := t.PhaseSeg1
-		if sjw > 4 {
-			sjw = 4
-		}
-		if sjw > maxSJW {
-			sjw = maxSJW
-		}
-		t.SJW = sjw
-		t.Clock = fOsc
+		return nil, can.Error("unable to calculate a bit timing")
 	}
-	return
+
+	t = &bestTiming
+	t.SJW = min(sjw, t.PhaseSeg1, t.PhaseSeg2, dev.SJWMax)
+	return t, nil
 }
 
 func abs(v int) int {
@@ -96,7 +140,11 @@ func abs(v int) int {
 	return v
 }
 
-func splitTSeg1(tseg1, ps1start int) (prop, ps1 int) {
+func minVal(v int) int {
+	return max(1, v)
+}
+
+func (dev *DevSpec) SplitTSeg1(tseg1, ps1start int) (prop, ps1 int) {
 	ps1 = ps1start
 
 	// propSeg gets the remaining tqs
@@ -109,6 +157,10 @@ func splitTSeg1(tseg1, ps1start int) (prop, ps1 int) {
 	}
 
 	// adjust prop, if it is too large to be programmable
+	maxProp := dev.PropSegMax
+	if maxProp == 0 {
+		maxProp = dev.TSeg1Max / 2
+	}
 	for prop > maxProp {
 		prop--
 		ps1++
@@ -116,15 +168,16 @@ func splitTSeg1(tseg1, ps1start int) (prop, ps1 int) {
 	return
 }
 
-func calcPhSeg2BySampleLoc(nq int, spLoc float32) (ps2 int) {
-	ps2 = int((1-spLoc)*float32(nq) + .5)
+func (dev *DevSpec) constrainPhSeg2(ps2 int) int {
+	minPhSeg2 := minVal(dev.TSeg2Min)
+
 	if ps2 < minPhSeg2 {
 		ps2 = minPhSeg2
 	}
-	if ps2 > maxPhSeg2 {
-		ps2 = maxPhSeg2
+	if ps2 > dev.TSeg2Max {
+		ps2 = dev.TSeg2Max
 	}
-	return
+	return ps2
 }
 
 func oscTol(sjw, prop, ps1, ps2 int) int {
