@@ -80,7 +80,15 @@ func splitName(name string) (prefix string, index int) {
 
 var ErrNotFound = errors.New("not found")
 
-func Lookup(name string) (*Link, error) {
+type Interface struct {
+	Name      string
+	conn      *rtnetlink.Conn
+	index     int
+	msgFamily uint16
+	msgType   uint16
+}
+
+func OpenInterface(name string) (*Interface, error) {
 	if name == "" {
 		list, err := List()
 		if err != nil {
@@ -89,7 +97,7 @@ func Lookup(name string) (*Link, error) {
 		if list == nil {
 			return nil, ErrNotFound
 		}
-		return list[0], nil
+		name = list[0].Name()
 	}
 	ifi, err := net.InterfaceByName(name)
 	if err != nil {
@@ -101,21 +109,47 @@ func Lookup(name string) (*Link, error) {
 	if err != nil {
 		return nil, fmt.Errorf("netlink: %w", err)
 	}
-	defer conn.Close()
 
-	link, err := conn.Link.Get(uint32(ifi.Index))
+	l := new(Interface)
+	l.Name = name
+	l.conn = conn
+	l.index = ifi.Index
+	msg, err := l.get()
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	l.msgFamily = msg.Family
+	l.msgType = msg.Type
+	return l, nil
+}
+
+func (link *Interface) Close() error {
+	return link.conn.Close()
+}
+
+func (link *Interface) get() (*rtnetlink.LinkMessage, error) {
+	msg, err := link.conn.Link.Get(uint32(link.index))
 	if err != nil {
 		return nil, fmt.Errorf("netlink: %w", err)
 	}
 
-	if link.Type != unix.ARPHRD_CAN {
-		return nil, fmt.Errorf("netlink: not a can device: %q", name)
+	if msg.Type != unix.ARPHRD_CAN {
+		return nil, fmt.Errorf("netlink: not a can device: %q", link.Name)
 	}
+	return &msg, nil
+}
 
-	info, err := newLinkInfo(link.Attributes)
+func (link *Interface) Info() (*Link, error) {
+	msg, err := link.get()
+	if err != nil {
+		return nil, err
+	}
+	info, err := newLinkInfo(msg.Attributes)
 	if err != nil {
 		return nil, fmt.Errorf("netlink: %w", err)
 	}
+
 	return info, nil
 }
 

@@ -72,15 +72,20 @@ func (driver) Open(devName string, options ...interface{}) (can.Device, error) {
 			return nil, fmt.Errorf("device %q not recognized", dev)
 		}
 	}
-	link, err := netlink.Lookup(devName)
+	link, err := netlink.OpenInterface(devName)
+	if err != nil {
+		return nil, err
+	}
+	info, err := link.Info()
+	link.Close()
 	if err != nil {
 		return nil, err
 	}
 	if devName == "" {
-		devName = link.Name()
+		devName = link.Name
 	}
 
-	err = scanOptions(link, options)
+	err = scanOptions(info, options)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +96,7 @@ func (driver) Open(devName string, options ...interface{}) (can.Device, error) {
 	}
 
 	d := new(dev)
-	d.mtu = int(link.Attr.MTU)
+	d.mtu = int(info.Attr.MTU)
 	err = unix.SetsockoptInt(fd, unix.SOL_CAN_RAW, unix.CAN_RAW_FD_FRAMES, 1)
 	if err != nil {
 		if d.mtu > linux.CAN_MTU {
@@ -103,7 +108,7 @@ func (driver) Open(devName string, options ...interface{}) (can.Device, error) {
 		return nil, wrapErr("open", err)
 	}
 	d.file = file
-	setupInfo(&d.name, link)
+	setupInfo(&d.name, info)
 	return d, nil
 }
 
