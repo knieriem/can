@@ -88,16 +88,16 @@ func (f *frame) encode(msg *can.Msg, mtu int) (nw int, err error) {
 func (f *frame) decode(msg *can.Msg) error {
 	id := f.id()
 	msg.Reset()
-	if (id & linux.CAN_ERR_FLAG) != 0 {
+	if id&linux.CAN_ERR_FLAG != 0 {
 		// error frame
 		msg.Flags |= can.StatusMsg
 
 		errClass := id & linux.CAN_ERR_MASK
-		if (errClass & linux.CAN_ERR_BUSOFF) != 0 {
+		if errClass&linux.CAN_ERR_BUSOFF != 0 {
 			msg.Flags |= can.BusOff
 		}
-		if (errClass & linux.CAN_ERR_CRTL) != 0 {
-			if (f.data()[1] & linux.CAN_ERR_CRTL_RX_OVERFLOW) != 0 {
+		if errClass&linux.CAN_ERR_CRTL != 0 {
+			if f.data()[1]&linux.CAN_ERR_CRTL_RX_OVERFLOW != 0 {
 				msg.Flags |= can.ReceiveBufferOverflow
 			}
 		}
@@ -105,13 +105,13 @@ func (f *frame) decode(msg *can.Msg) error {
 	}
 
 	idMask := uint32(linux.CAN_SFF_MASK)
-	if (id & linux.CAN_EFF_FLAG) != 0 {
+	if id&linux.CAN_EFF_FLAG != 0 {
 		/* extended frame */
 		msg.Flags = can.ExtFrame
 		idMask = linux.CAN_EFF_MASK
 	}
 	msg.Id = id & idMask
-	if (id & linux.CAN_RTR_FLAG) != 0 {
+	if id&linux.CAN_RTR_FLAG != 0 {
 		msg.Flags = can.RTRMsg
 		return nil
 	}
