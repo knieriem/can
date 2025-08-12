@@ -1,8 +1,6 @@
 package timing
 
-import (
-	"github.com/knieriem/can"
-)
+import "errors"
 
 const (
 	tq      = 1
@@ -124,11 +122,13 @@ func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, dev *DevSpec, opts ...C
 	}
 
 	if bestTiming.PhaseSeg2 == 0 {
-		return nil, can.Error("unable to calculate a bit timing")
+		return nil, ErrNoValidBitTimingFound
 	}
 
 	return &bestTiming, nil
 }
+
+var ErrNoValidBitTimingFound = errors.New("can: no valid bit timing found")
 
 func abs(v int) int {
 	if v < 0 {
