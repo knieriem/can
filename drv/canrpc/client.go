@@ -11,7 +11,7 @@
 // running on host 192.168.1.2, port 6000, the address provided to
 // to the can.Open call would be written as:
 //
-// 	rpc:192.168.1.2:6000
+//	rpc:192.168.1.2:6000
 //
 // An optional name can be appended, prefixed by a slash, if the
 // server is exporting multiple CAN devices:
