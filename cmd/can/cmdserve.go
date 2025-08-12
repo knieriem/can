@@ -11,7 +11,6 @@ import (
 	"net/rpc"
 
 	"github.com/knieriem/can"
-	_ "github.com/knieriem/can/drv/can4linux"
 	"github.com/knieriem/can/drv/canrpc"
 	_ "github.com/knieriem/can/drv/pcan"
 
