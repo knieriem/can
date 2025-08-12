@@ -8,18 +8,22 @@ import (
 // Bittiming defines the CAN bit timing values.
 // The length of a time quantum, as mentioned below,
 // is the oscillator period multiplied with the prescaler value
-// (and, depending on the device, the value of an extra device-internal divider).
+// (and, depending on the device, the value of an extra,
+// device-internal divider).
 type BitTiming struct {
 	// Prescaler defines the value of a device's programmable prescaler.
 	Prescaler int
 
-	// PropSeg defines the length of the propagation time segment, in time quanta.
+	// PropSeg defines the length of the propagation time segment,
+	// in time quanta.
 	PropSeg int
 
-	// PhaseSeg1 defines the length of the phase buffer segment 1, in time quanta.
+	// PhaseSeg1 defines the length of the phase buffer segment 1,
+	// in time quanta.
 	PhaseSeg1 int
 
-	// PhaseSeg2 defines the length of the phase buffer segment 2, in time quanta.
+	// PhaseSeg2 defines the length of the phase buffer segment 2,
+	// in time quanta.
 	PhaseSeg2 int
 
 	// SJW defines the resynchronization jump width, in time quanta.
