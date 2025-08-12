@@ -77,7 +77,7 @@ type dev struct {
 	}
 }
 
-func (*driver) Open(devName string, options ...interface{}) (cd can.Device, err error) {
+func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error) {
 	defer wrapErr("open", &err)
 
 	hwList, err := parseProcfile()
@@ -109,7 +109,7 @@ func (*driver) Open(devName string, options ...interface{}) (cd can.Device, err 
 		Driver: "pcan",
 	}
 
-	bitrate, err := scanOptions(options)
+	bitrate, err := scanOptions(conf)
 	if err != nil {
 		return
 	}

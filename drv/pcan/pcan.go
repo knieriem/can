@@ -18,7 +18,7 @@ const (
 	defaultBitrate = api.Baud500K
 )
 
-var builtinBitrates = map[can.Bitrate]uint16{
+var builtinBitrates = map[uint32]uint16{
 	1000000: 0x0014,
 	800000:  0x0016,
 	500000:  0x001C,
@@ -48,20 +48,16 @@ func (*driver) Name() string {
 	return "pcan"
 }
 
-func scanOptions(list []interface{}) (bitrate uint16, err error) {
-	bitrate = defaultBitrate
-	for _, opt := range list {
-		switch v := opt.(type) {
-		case can.Bitrate:
-			if b, ok := builtinBitrates[v]; ok {
-				bitrate = b
-			} else {
-				err = errors.New("bitrate not supported")
-				return
-			}
+func scanOptions(c *can.Config) (timingConf uint16, err error) {
+	timingConf = defaultBitrate
+	if v := c.Nominal.Bitrate; v != 0 {
+		if tc, ok := builtinBitrates[v]; ok {
+			timingConf = tc
+		} else {
+			return 0, errors.New("bitrate not supported")
 		}
 	}
-	return
+	return timingConf, nil
 }
 
 type busList []*bus

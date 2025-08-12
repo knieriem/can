@@ -18,7 +18,7 @@ func (e Error) Error() string {
 type Driver interface {
 	Name() string
 	//	Version() string
-	Open(name string, options ...interface{}) (Device, error)
+	Open(name string, conf *Config) (Device, error)
 	Scan() []Name
 }
 
@@ -87,26 +87,47 @@ type Version struct {
 	SerialNum string
 }
 
+type Option func(*openProps)
+
+type openProps struct {
+	conf *Config
+}
+
+func WithConfig(conf *Config) Option {
+	return func(p *openProps) {
+		p.conf = conf
+	}
+}
+
 //
 //	driverName:deviceName:[,option][,option2]
 //
 //	name	Go driver name
-func Open(deviceName string, options ...string) (dev Device, err error) {
-	f := strings.Split(deviceName, ",")
-	optFields := f[1:]
-	optList, err := parseOptions(optFields)
-	if err != nil {
-		return
+func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
+	var p openProps
+	for _, o := range opts {
+		o(&p)
 	}
-	deviceName = f[0]
+	if p.conf == nil {
+		f := strings.Split(deviceSpec, ",")
+		if len(f) > 1 {
+			optFields := f[1:]
+			c, err := ParseConfig(optFields...)
+			if err != nil {
+				return nil, err
+			}
+			p.conf = c
+			deviceSpec = f[0]
+		}
+	}
 
-	f = strings.SplitN(deviceName, ":", 2)
+	f := strings.SplitN(deviceSpec, ":", 2)
 	name := ""
 
 	drvName := f[0]
 	if drvName == "" {
 		for _, drv := range drvlist {
-			dev, err = drv.Open(name, optList...)
+			dev, err = drv.Open(name, p.conf)
 			if err == nil {
 				return
 			}
@@ -118,10 +139,9 @@ func Open(deviceName string, options ...string) (dev Device, err error) {
 	if len(f) == 2 {
 		name = f[1]
 	}
-
 	for _, drv := range drvlist {
 		if drv.Name() == drvName {
-			return drv.Open(name, optList...)
+			return drv.Open(name, p.conf)
 		}
 	}
 	err = Error("driver not found: " + drvName)
@@ -145,7 +165,7 @@ var UnsupportedDriver Driver = unsupported{}
 type unsupported struct{}
 
 func (unsupported) Name() string { return "unsupported" }
-func (unsupported) Open(name string, options ...interface{}) (Device, error) {
+func (unsupported) Open(name string, conf *Config) (Device, error) {
 	return nil, errors.New("not supported")
 }
 func (unsupported) Scan() []Name { return nil }

@@ -68,7 +68,7 @@ func (*driver) Scan() (list []can.Name) {
 	return
 }
 
-func (*driver) Open(addr string, _ ...interface{}) (cd can.Device, err error) {
+func (*driver) Open(addr string, _ *can.Config) (cd can.Device, err error) {
 
 	d := new(device)
 
