@@ -52,7 +52,7 @@ func AlignPhSeg1PhSeg2() CalcOption {
 // Zero values may be used for the sample point and
 // for the resynchronization jump width (sjw),
 // in which case sp=87.5 % and sjw=1 are substituted.
-func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, sjw int, dev *DevSpec, opts ...CalcOption) (t *BitTiming, err error) {
+func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, dev *DevSpec, opts ...CalcOption) (t *BitTiming, err error) {
 	var conf calcConf
 
 	for _, o := range opts {
@@ -69,7 +69,6 @@ func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, sjw int, dev *DevSpec, 
 		nq0 /= uint32(dev.FOscDiv)
 	}
 
-	sjw = max(sjw, 1)
 	sp.setupLazy(bitrate)
 
 	for preSc := minVal(dev.PrescalerMin); preSc < dev.PrescalerMax; preSc += incr {
@@ -128,9 +127,7 @@ func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, sjw int, dev *DevSpec, 
 		return nil, can.Error("unable to calculate a bit timing")
 	}
 
-	t = &bestTiming
-	t.SJW = min(sjw, t.PhaseSeg1, t.PhaseSeg2, dev.SJWMax)
-	return t, nil
+	return &bestTiming, nil
 }
 
 func abs(v int) int {

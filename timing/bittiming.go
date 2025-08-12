@@ -106,7 +106,7 @@ func (t *BitTiming) TSeg2() int {
 // prescaler, an extra divider to fOsc, the argument to Tq must be divided by
 // that value. For instance, a MCP2515 contains an internal division by two,
 // so in case of a 16 MHz oscillator the argument fOsc should be 8 MHz.
-func (t *BitTiming) Tq(fOsc uint32) time.Duration {
+func (t *BitTiming) CalcTq(fOsc uint32) time.Duration {
 	return time.Second * time.Duration(t.Prescaler) / time.Duration(fOsc)
 }
 
@@ -125,4 +125,19 @@ func (t *BitTiming) Bitrate(fOsc uint32) uint32 {
 // SamplePoint returns the sample point defined by the BitTiming values.
 func (t *BitTiming) SamplePoint() SamplePoint {
 	return calcSamplePoint(t.TSeg1(), t.Nq())
+}
+
+// ConstrainSJW ensures that SJW is between bounds 1 and - in case these
+// values are not zero - the minimum values of PhaseSeg1,
+// PhaseSeg2 and maxSJW.
+func (t *BitTiming) ConstrainSJW(maxSJW int) {
+	sjw := t.SJW
+	sjw = max(1, sjw)
+	if t.PhaseSeg1 != 0 && t.PhaseSeg2 != 0 {
+		sjw = min(sjw, t.PhaseSeg1, t.PhaseSeg2)
+	}
+	if maxSJW != 0 {
+		sjw = min(sjw, maxSJW)
+	}
+	t.SJW = sjw
 }

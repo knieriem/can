@@ -136,11 +136,13 @@ func TestCalc(t *testing.T) {
 		if f := test.fOsc; f != 0 {
 			fOsc = f
 		}
-		bt, err := timing.CalcBitTiming(fOsc, test.bitrate, test.sp, test.sjw, dev.spec, test.opts...)
+		bt, err := timing.CalcBitTiming(fOsc, test.bitrate, test.sp, dev.spec, test.opts...)
 		if err != nil {
 			t.Error(err)
 			continue
 		}
+		bt.SJW = test.sjw
+		bt.ConstrainSJW(dev.spec.SJWMax)
 		if test.bt != nil {
 			if !bitTimingsEqual(test.bt, bt, test.cmpTSeg1) {
 				t.Errorf("test %d: timing mismatch %#v != %#v", i, test.bt, bt)
@@ -157,7 +159,7 @@ func TestCalc(t *testing.T) {
 			if div := dev.spec.FOscDiv; div != 0 {
 				f = f / uint32(div)
 			}
-			if tq := bt.Tq(f); tq != xTq {
+			if tq := bt.CalcTq(f); tq != xTq {
 				t.Errorf("test %d: tq mismatch: %v != %v", i, tq, xTq)
 			}
 		}
