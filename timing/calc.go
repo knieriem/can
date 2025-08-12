@@ -91,7 +91,7 @@ func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, dev *DevSpec, opts ...C
 			ps2++
 			goto again
 		}
-		// we need at least 1tq for each of propSeg and phSeg1
+		// at least 1tq for each of propSeg and phSeg1 needed
 		if tseg1 < 2 {
 			break
 		}
