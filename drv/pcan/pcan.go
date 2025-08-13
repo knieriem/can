@@ -48,16 +48,15 @@ func (*driver) Name() string {
 	return "pcan"
 }
 
-func scanOptions(c *can.Config) (timingConf uint16, err error) {
-	timingConf = defaultBitrate
+func timingConf(c *can.Config) (tc uint16, err error) {
 	if v := c.Nominal.Bitrate; v != 0 {
 		if tc, ok := builtinBitrates[v]; ok {
-			timingConf = tc
+			return tc, nil
 		} else {
 			return 0, errors.New("bitrate not supported")
 		}
 	}
-	return timingConf, nil
+	return defaultBitrate, nil
 }
 
 type busList []*bus

@@ -109,20 +109,22 @@ func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error)
 		Driver: "pcan",
 	}
 
-	bitrate, err := scanOptions(conf)
-	if err != nil {
-		return
-	}
-
-	var i api.Init
-	i.WBTR0BTR1 = bitrate
-	i.UcCANMsgType = api.MsgExtended
-	err = d.h.Init(&i)
-	if err != nil {
-		if runtime.GOARCH == "386" && err == syscall.EINVAL {
-			err = errors.New("32-bit program / 64-bit driver mismatch")
+	if conf != nil {
+		bitrate, err := timingConf(conf)
+		if err != nil {
+			return nil, err
 		}
-		return
+
+		var i api.Init
+		i.WBTR0BTR1 = bitrate
+		i.UcCANMsgType = api.MsgExtended
+		err = d.h.Init(&i)
+		if err != nil {
+			if runtime.GOARCH == "386" && err == syscall.EINVAL {
+				err = errors.New("32-bit program / 64-bit driver mismatch")
+			}
+			return nil, err
+		}
 	}
 
 	if d.receive.epoll, err = epoll.NewPollster(); err != nil {
