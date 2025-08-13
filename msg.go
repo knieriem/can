@@ -15,6 +15,10 @@ const (
 	RTRMsg
 	StatusMsg
 
+	// FD specific flags
+	FDSwitchBitrate
+	ForceFD
+
 	// if StatusMsg is set:
 	ErrorActive
 	ErrorPassive
