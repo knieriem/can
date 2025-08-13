@@ -20,7 +20,9 @@ const (
 	ForceFD
 
 	// if StatusMsg is set:
+	MissingAck
 	ErrorActive
+	ErrorWarning
 	ErrorPassive
 	BusOff
 	DataOverrun
