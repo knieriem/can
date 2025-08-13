@@ -19,20 +19,20 @@ const (
 )
 
 var builtinBitrates = map[uint32]uint16{
-	1000000: 0x0014,
-	800000:  0x0016,
-	500000:  0x001C,
-	250000:  0x011C,
-	125000:  0x031C,
-	100000:  0x432F,
-	95000:   0xC34E,
-	83000:   0x852B,
-	50000:   0x472F,
-	47000:   0x1414,
-	33000:   0x8B2F,
-	20000:   0x532F,
-	10000:   0x672F,
-	5000:    0x7F7F,
+	1000000: api.Baud1M,
+	800000:  api.Baud800K,
+	500000:  api.Baud500K,
+	250000:  api.Baud250K,
+	125000:  api.Baud125K,
+	100000:  api.Baud100K,
+	95000:   api.Baud95K,
+	83000:   api.Baud83K,
+	50000:   api.Baud50K,
+	47000:   api.Baud47K,
+	33000:   api.Baud33K,
+	20000:   api.Baud20K,
+	10000:   api.Baud10K,
+	5000:    api.Baud5K,
 }
 
 func init() {
