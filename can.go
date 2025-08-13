@@ -169,3 +169,9 @@ func (unsupported) Open(name string, conf *Config) (Device, error) {
 	return nil, errors.New("not supported")
 }
 func (unsupported) Scan() []Name { return nil }
+
+// ErrTxQueueFull is returned when a Msg could not be added
+// to the devices' transmit queue. On Linux, it is returned
+// in case of ENOBUFS. Normally this error is caused by a wiring
+// problem, or if no CAN node is present on the bus.
+var ErrTxQueueFull = Error("tx queue full")
