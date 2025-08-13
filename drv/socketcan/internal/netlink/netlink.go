@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/jsimonetti/rtnetlink"
+	"github.com/knieriem/can"
 )
 
 func List() ([]*Link, error) {
@@ -154,6 +155,39 @@ func (link *Interface) Info() (*Link, error) {
 	}
 
 	return info, nil
+}
+
+func (intf *Interface) UpDown(up bool) error {
+	link, err := intf.get()
+	if err != nil {
+		return err
+	}
+
+	var flags uint32
+	st := link.Attributes.OperationalState
+	if up {
+		if st == rtnetlink.OperStateUp || st == rtnetlink.OperStateUnknown {
+			return nil
+		}
+		flags = unix.IFF_UP
+	} else if st == rtnetlink.OperStateDown {
+		return nil
+	}
+
+	return intf.conn.Link.Set(&rtnetlink.LinkMessage{
+		Family: link.Family,
+		Type:   link.Type,
+		Index:  uint32(intf.index),
+		Flags:  flags,
+		Change: unix.IFF_UP,
+	})
+}
+
+func (intf *Interface) SetConfig(conf *can.Config) error {
+	enc := NewCANAttrEncoder()
+	enc.SetConfig(conf)
+	return enc.UpdateLink(intf)
+
 }
 
 type Link struct {

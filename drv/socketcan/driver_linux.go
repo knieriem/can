@@ -16,9 +16,25 @@ import (
 	"github.com/knieriem/can/drv/socketcan/internal/netlink"
 )
 
-var Driver can.Driver = driver{}
+func NewDriver(opts ...DriverOption) can.Driver {
+	drv := new(driver)
+	for _, o := range opts {
+		o(drv)
+	}
+	return drv
+}
 
-type driver struct{}
+type DriverOption func(*driver)
+
+func WithPrivilegedUtil() DriverOption {
+	return func(d *driver) {
+		d.privilegedCmd = "socketcan-link"
+	}
+}
+
+type driver struct {
+	privilegedCmd string
+}
 
 func (driver) Name() string {
 	return "socketcan"
@@ -55,7 +71,7 @@ func (driver) Scan() []can.Name {
 	return list
 }
 
-func (driver) Open(devName string, options ...interface{}) (can.Device, error) {
+func (drv *driver) Open(devName string, conf *can.Config) (can.Device, error) {
 	if strings.HasPrefix(devName, "@") {
 		// devName is system device
 		dev := devName[1:]
@@ -81,23 +97,46 @@ func (driver) Open(devName string, options ...interface{}) (can.Device, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	var cleanupPriv func()
+	if conf != nil {
+		priv := privilegedAccess(&privilegedDirect{Interface: link})
+		if drv.privilegedCmd != "" {
+			priv, err = startPrivilegedUtil(drv.privilegedCmd, link.Name)
+			if err != nil {
+				return nil, err
+			}
+			defer func() {
+				if cleanupPriv != nil {
+					cleanupPriv()
+				}
+			}()
+			cleanupPriv = func() {
+				priv.Close()
+			}
+		}
+		err = priv.SetConfig(conf)
+		if err != nil {
+			return nil, err
+		}
+		err = priv.UpDown(true)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if devName == "" {
 		devName = link.Name
-	}
-
-	info, err := link.Info()
-	if err != nil {
-		return nil, err
-	}
-
-	err = scanOptions(info, options)
-	if err != nil {
-		return nil, err
 	}
 
 	fd, err := setupSocket(devName)
 	if err != nil {
 		return nil, wrapErr("open", err)
+	}
+
+	info, err := link.Info()
+	if err != nil {
+		return nil, err
 	}
 
 	d := new(dev)
@@ -107,6 +146,7 @@ func (driver) Open(devName string, options ...interface{}) (can.Device, error) {
 		if d.mtu > linux.CAN_MTU {
 			d.mtu = linux.CAN_MTU
 		}
+		return nil, wrapErr("setsockopt", fmt.Errorf("cannot enter FD mode: %w", err))
 	}
 	file, err := pollableFile(fd)
 	if err != nil {
@@ -114,21 +154,8 @@ func (driver) Open(devName string, options ...interface{}) (can.Device, error) {
 	}
 	d.file = file
 	setupInfo(&d.name, info)
+	cleanupPriv = nil
 	return d, nil
-}
-
-func scanOptions(link *netlink.Link, options []interface{}) error {
-	for _, opt := range options {
-		switch v := opt.(type) {
-		case can.Bitrate:
-			if confBitrate, ok := link.Bitrate(); ok {
-				if uint32(v) != confBitrate {
-					return fmt.Errorf("requested bitrate (%v bps) does not match current one (%v bps)", v, confBitrate)
-				}
-			}
-		}
-	}
-	return nil
 }
 
 // setupSocket is setting up a raw CAN socket, as described in

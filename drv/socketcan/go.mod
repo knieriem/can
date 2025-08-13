@@ -1,12 +1,14 @@
 module github.com/knieriem/can/drv/socketcan
 
-go 1.18
+go 1.22
+
+toolchain go1.24.6
 
 require (
 	github.com/jsimonetti/rtnetlink v1.3.4
-	github.com/knieriem/can v0.3.0-alpha2
+	github.com/knieriem/can v0.3.0-alpha5
 	github.com/mdlayher/netlink v1.7.2
-	golang.org/x/sys v0.18.0
+	golang.org/x/sys v0.26.0
 )
 
 require (
