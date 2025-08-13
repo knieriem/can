@@ -72,17 +72,22 @@ func (driver) Open(devName string, options ...interface{}) (can.Device, error) {
 			return nil, fmt.Errorf("device %q not recognized", dev)
 		}
 	}
-	link, err := netlink.OpenInterface(devName)
+	conn, err := netlink.Dial()
 	if err != nil {
 		return nil, err
 	}
-	info, err := link.Info()
-	link.Close()
+	defer conn.Close()
+	link, err := conn.OpenInterface(devName)
 	if err != nil {
 		return nil, err
 	}
 	if devName == "" {
 		devName = link.Name
+	}
+
+	info, err := link.Info()
+	if err != nil {
+		return nil, err
 	}
 
 	err = scanOptions(info, options)

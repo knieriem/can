@@ -78,17 +78,30 @@ func splitName(name string) (prefix string, index int) {
 	return prefix, index
 }
 
+type Conn struct {
+	*rtnetlink.Conn
+}
+
 var ErrNotFound = errors.New("not found")
 
 type Interface struct {
 	Name      string
-	conn      *rtnetlink.Conn
+	conn      *Conn
 	index     int
 	msgFamily uint16
 	msgType   uint16
 }
 
-func OpenInterface(name string) (*Interface, error) {
+func Dial() (*Conn, error) {
+	// Dial a connection to the rtnetlink socket
+	conn, err := rtnetlink.Dial(nil)
+	if err != nil {
+		return nil, fmt.Errorf("netlink: %w", err)
+	}
+	return &Conn{Conn: conn}, nil
+}
+
+func (conn *Conn) OpenInterface(name string) (*Interface, error) {
 	if name == "" {
 		list, err := List()
 		if err != nil {
@@ -104,12 +117,6 @@ func OpenInterface(name string) (*Interface, error) {
 		return nil, err
 	}
 
-	// Dial a connection to the rtnetlink socket
-	conn, err := rtnetlink.Dial(nil)
-	if err != nil {
-		return nil, fmt.Errorf("netlink: %w", err)
-	}
-
 	l := new(Interface)
 	l.Name = name
 	l.conn = conn
@@ -122,10 +129,6 @@ func OpenInterface(name string) (*Interface, error) {
 	l.msgFamily = msg.Family
 	l.msgType = msg.Type
 	return l, nil
-}
-
-func (link *Interface) Close() error {
-	return link.conn.Close()
 }
 
 func (link *Interface) get() (*rtnetlink.LinkMessage, error) {
