@@ -3,11 +3,13 @@
 package socketcan
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"golang.org/x/sys/unix"
 
@@ -239,6 +241,9 @@ func (d *dev) WriteMsg(msg *can.Msg) error {
 	}
 	_, err = d.file.Write(f.b[:nf])
 	if err != nil {
+		if errors.Is(err, syscall.ENOBUFS) {
+			err = can.ErrTxQueueFull
+		}
 		return wrapErr("write", err)
 	}
 	return nil
