@@ -148,7 +148,7 @@ func (drv *driver) Open(devName string, conf *can.Config) (can.Device, error) {
 		if d.mtu > linux.CAN_MTU {
 			d.mtu = linux.CAN_MTU
 		}
-		return nil, wrapErr("setsockopt", fmt.Errorf("cannot enter FD mode: %w", err))
+		return nil, wrapErr("open", fmt.Errorf("cannot enter FD mode: %w", err))
 	}
 
 	errMask := linux.CAN_ERR_CRTL |
