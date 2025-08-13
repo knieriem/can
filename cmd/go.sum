@@ -1,0 +1,12 @@
+github.com/knieriem/can v0.2.0 h1:9bA9c4BuhC+qhwmaL0BfNJa2lAb71dWUxG3FJE0gOKU=
+github.com/knieriem/can v0.2.0/go.mod h1:3D8LWGlyroqPO1D9Wq9s6uVtix+OasUI+Adc/uwEoik=
+github.com/knieriem/g v0.1.0 h1:/taBVDjhfK2WqCAkTc9bUeAfoV+TPxeh9fxKTbhHcCw=
+github.com/knieriem/g v0.1.0/go.mod h1:Cxrkopw+HrVRIxTQzwKvLf0zImHa1q6L0RUElAh3a9k=
+github.com/knieriem/text v0.1.0/go.mod h1:wmcypC3FdJ4mBqO0DPLbTX7QxB4+n9oOU+3QektAZzs=
+github.com/knieriem/text v0.1.1 h1:soHAOGl9ImS4GnGyXz1ysOflZgRo5mDmqM5av9RxY5Y=
+github.com/knieriem/text v0.1.1/go.mod h1:4h57Q3GvItfA7H/EW3wd9i83WEF7CcS0RUesQKw/vu0=
+github.com/knieriem/tool v0.0.0-20160811200059-f4b909d55828/go.mod h1:7FK8IPV+NQPUF3ZQOMmJjtnhkVnq5gaF4kXzRMknwwE=
+github.com/knieriem/tool v0.1.0 h1:FrvyuiVUwmvjbAX3p/IuTMEv+G/tuk4BeduA+dJwMp8=
+github.com/knieriem/tool v0.1.0/go.mod h1:FoYPs/m4GaKyJebNuBoAKu/sBrQNJnkRoc1t6ZSCCX0=
+github.com/knieriem/vfsutil v0.1.0/go.mod h1:vDmi2mPOtfrWx5UDrPmaErqvaMyTdBnfvPqqIxjP9ik=
+golang.org/x/tools v0.0.0-20180727195141-8cc4e8a6f484/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
