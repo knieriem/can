@@ -93,14 +93,21 @@ func (f *frame) decode(msg *can.Msg) error {
 	if id&linux.CAN_ERR_FLAG != 0 {
 		// error frame
 		msg.Flags |= can.StatusMsg
+		ctrlStatus := f.data()[1]
 
 		errClass := id & linux.CAN_ERR_MASK
+		if errClass&linux.CAN_ERR_ACK != 0 {
+			msg.Flags |= can.MissingAck
+		}
 		if errClass&linux.CAN_ERR_BUSOFF != 0 {
 			msg.Flags |= can.BusOff
 		}
 		if errClass&linux.CAN_ERR_CRTL != 0 {
-			if f.data()[1]&linux.CAN_ERR_CRTL_RX_OVERFLOW != 0 {
+			if ctrlStatus&linux.CAN_ERR_CRTL_RX_OVERFLOW != 0 {
 				msg.Flags |= can.ReceiveBufferOverflow
+			}
+			if ctrlStatus&linux.CAN_ERR_CRTL_TX_WARNING != 0 {
+				msg.Flags |= can.ErrorWarning
 			}
 		}
 		return nil

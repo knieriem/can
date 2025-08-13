@@ -148,6 +148,17 @@ func (drv *driver) Open(devName string, conf *can.Config) (can.Device, error) {
 		}
 		return nil, wrapErr("setsockopt", fmt.Errorf("cannot enter FD mode: %w", err))
 	}
+
+	errMask := linux.CAN_ERR_CRTL |
+		linux.CAN_ERR_BUSOFF |
+		linux.CAN_ERR_ACK |
+		linux.CAN_ERR_BUSERROR |
+		linux.CAN_ERR_RESTARTED |
+		linux.CAN_ERR_TX_TIMEOUT
+	err = unix.SetsockoptInt(fd, unix.SOL_CAN_RAW, unix.CAN_RAW_ERR_FILTER, errMask)
+	if err != nil {
+		return nil, wrapErr("open", err)
+	}
 	file, err := pollableFile(fd)
 	if err != nil {
 		return nil, wrapErr("open", err)
