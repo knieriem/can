@@ -18,6 +18,12 @@ import (
 	"github.com/knieriem/can/drv/socketcan/internal/netlink"
 )
 
+var Driver = defaultDriver
+
+var defaultDriver = can.Driver(&driver{
+	privilegedCmd: "socketcan-link",
+})
+
 func NewDriver(opts ...DriverOption) can.Driver {
 	drv := new(driver)
 	for _, o := range opts {
