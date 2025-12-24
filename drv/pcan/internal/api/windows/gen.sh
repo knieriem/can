@@ -25,19 +25,6 @@ GCC=/usr/bin/$gccarch-gcc
 
 SFX=_${OS}_$GOARCH.go
 
-src=${pkg}_$OS.go
-mv $src _$src
-sed '/^package/s,syscall,none,' <_$src >$src
-GOARCH= GOOS= go run golang.org/x/sys/windows/mkwinsyscall $src |
-	sed 's/^package.*none/package '$pkg'/' |
-	gofmt > z$pkg$SFX
-rm -f $src
-mv _$src $src
-
-#perl $mksyscall $arch ${pkg}_$OS.go |
-#	sed '/import *"DISABLEDunsafe"/d' |
-#	gofmt > z$pkg$SFX
-
 if test -f windows/types.go; then
 	# note: cgo execution depends on $GOARCH value
 	CC=$GCC go tool cgo -godefs windows/types.go |

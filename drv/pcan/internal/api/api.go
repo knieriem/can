@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:generate go run golang.org/x/sys/windows/mkwinsyscall -output zapi_windows.go api_windows.go
 package api
 
 type Status uint32

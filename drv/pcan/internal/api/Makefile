@@ -5,9 +5,7 @@ L=linux
 
 ZFILESWIN=\
 	ztypes_$W_386.go\
-	z$P_$W_386.go\
 	ztypes_$W_amd64.go\
-	z$P_$W_amd64.go\
 
 
 ZFILESLIN=\
@@ -30,7 +28,7 @@ zfiles: \
 	$(ZFILESLIN)\
 
 unify:
-	for f in zapi_linux ztypes_linux zapi_windows ztypes_windows; do \
+	for f in zapi_linux ztypes_linux ztypes_windows; do \
 		sh unify.sh $$f; \
 	done \
 
@@ -45,7 +43,6 @@ zdef%.go: \
 $(ZFILESWIN): \
 	$W/gen.sh\
 	$W/types.go\
-	$P_$W.go\
 
 	GOARCH=386 GOOS=$W sh ./$W/gen.sh
 	GOARCH=amd64 GOOS=$W sh ./$W/gen.sh
