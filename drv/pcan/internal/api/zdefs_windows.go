@@ -123,7 +123,7 @@ const (
 	IoDigitalSet                     = 0x26
 	IoDigitalClear                   = 0x27
 	IoAnalogValue                    = 0x28
-	FirmwareVersion                  = 0x29
+	FirmwareVersion        StringPar = 0x29
 	AttachedChannelsCount            = 0x2A
 	AttachedChannels                 = 0x2B
 	AllowEchoFrames                  = 0x2C

@@ -306,7 +306,11 @@ func (d *dev) Version() (v can.Version) {
 	}
 	chanVer, st := d.h.StringVal(api.ChanVersion)
 	if st == api.OK {
-		v.Device = chanVer
+		v.Driver = chanVer
+	}
+	fwVer, st := d.h.StringVal(api.FirmwareVersion)
+	if st == api.OK {
+		v.Device = fwVer
 	}
 	return
 }
