@@ -115,6 +115,44 @@ func (h Handle) BoolVal(p BoolPar) (b bool, st Status) {
 	return
 }
 
+func AttachedDevices() []ChanInf {
+	n, st := NoneBus.IntVal(AttachedChannelsCount)
+	if st != OK || n <= 0 {
+		return nil
+	}
+	buf := make([]ChanInf, n)
+
+	p := uintptr(unsafe.Pointer(unsafe.SliceData(buf)))
+	sz := uintptr(len(buf)) * unsafe.Sizeof(buf[0])
+
+	if st = getValue(NoneBus, AttachedChannels, p, sz); st != OK {
+		return nil
+	}
+	return buf
+}
+
+func (ci *ChanInf) Available() bool {
+	return ci.Channel_condition == ChanAvailable
+}
+
+func (ci *ChanInf) Handle() Handle {
+	return Handle(ci.Channel_handle)
+}
+
+func (ci *ChanInf) DeviceName() string {
+	b := unsafe.Slice((*byte)(unsafe.Pointer(&ci.Device_name[0])), len(ci.Device_name))
+	return windows.ByteSliceToString(b)
+}
+
+func (ci *ChanInf) DisplayName() string {
+	name := ci.DeviceName()
+	if name != "" {
+		name += " "
+	}
+	name += "#" + strconv.Itoa(int(ci.Device_id))
+	return name
+}
+
 func (h Handle) Available() (is bool) {
 	v, st := h.IntVal(ChanCondition)
 	if st == 0 && v == ChanAvailable {

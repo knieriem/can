@@ -124,7 +124,7 @@ const (
 	IoDigitalClear                   = 0x27
 	IoAnalogValue                    = 0x28
 	FirmwareVersion        StringPar = 0x29
-	AttachedChannelsCount            = 0x2A
+	AttachedChannelsCount  IntPar    = 0x2A
 	AttachedChannels                 = 0x2B
 	AllowEchoFrames                  = 0x2C
 	DevicePartNumber                 = 0x2D

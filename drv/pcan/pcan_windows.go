@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -85,6 +86,16 @@ var hwList = busList{
 	},
 }
 
+func (buses busList) reverseLookup(h api.Handle) (*bus, int) {
+	for _, b := range buses {
+		i := slices.Index(b.channels, h)
+		if i != -1 {
+			return b, i
+		}
+	}
+	return nil, -1
+}
+
 type dev struct {
 	name    can.Name
 	h       api.Handle
@@ -98,22 +109,22 @@ type dev struct {
 }
 
 func (*driver) Scan() (list []can.Name) {
-	for _, bus := range hwList {
-		if !bus.pnp {
+	d := api.AttachedDevices()
+	for i := range d {
+		ch := &d[i]
+		if !ch.Available() {
 			continue
 		}
-		for i, ch := range bus.channels {
-			if ch.Available() {
-				ch.Initialize(api.Baud500K, 0, 0, 0)
-				disp := ch.DisplayName()
-				ch.Uninitialize()
-				list = append(list, can.Name{
-					ID:      bus.name + strconv.Itoa(i+1),
-					Display: disp,
-					Driver:  "pcan",
-				})
-			}
+		bus, i := hwList.reverseLookup(ch.Handle())
+		if bus == nil {
+			continue
 		}
+		disp := ch.DisplayName()
+		list = append(list, can.Name{
+			ID:      bus.name + strconv.Itoa(i+1),
+			Display: disp,
+			Driver:  "pcan",
+		})
 	}
 	return
 }

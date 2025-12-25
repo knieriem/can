@@ -23,3 +23,5 @@ type Mode C.TPCANMode
 type Msg	C.TPCANMsg
 
 type TimeStamp	C.TPCANTimestamp
+
+type ChanInf C.TPCANChannelInformation

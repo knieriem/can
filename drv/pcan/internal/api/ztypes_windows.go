@@ -22,3 +22,13 @@ type TimeStamp struct {
 	Overflow uint16
 	Micros   uint16
 }
+
+type ChanInf struct {
+	Channel_handle    uint16
+	Device_type       uint8
+	Controller_number uint8
+	Device_features   uint32
+	Device_name       [33]int8
+	Device_id         uint32
+	Channel_condition uint32
+}
