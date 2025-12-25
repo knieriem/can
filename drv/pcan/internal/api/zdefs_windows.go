@@ -3,17 +3,6 @@ package api
 const (
 	NoneBus Handle = 0x00
 
-	ISABUS1 Handle = 0x21
-	ISABUS2 Handle = 0x22
-	ISABUS3 Handle = 0x23
-	ISABUS4 Handle = 0x24
-	ISABUS5 Handle = 0x25
-	ISABUS6 Handle = 0x26
-	ISABUS7 Handle = 0x27
-	ISABUS8 Handle = 0x28
-
-	DNGBUS1 Handle = 0x31
-
 	PCIBUS1  Handle = 0x41
 	PCIBUS2  Handle = 0x42
 	PCIBUS3  Handle = 0x43
@@ -47,9 +36,6 @@ const (
 	USBBUS14 Handle = 0x50E
 	USBBUS15 Handle = 0x50F
 	USBBUS16 Handle = 0x510
-
-	PCCBUS1 Handle = 0x61
-	PCCBUS2 Handle = 0x62
 
 	LANBUS1  Handle = 0x801
 	LANBUS2  Handle = 0x802
@@ -121,10 +107,9 @@ const (
 	ChanIdentifying                  = 0x15
 	ChanFeatures                     = 0x16
 	BitrateAdapting                  = 0x17
-	BitrateInfo                      = 0x18
 	BitrateInfoFd                    = 0x19
 	BusspeedNominal                  = 0x1A
-	BusspeedData                     = 0x1B
+	BusspeedFd                       = 0x1B
 	IpAddress                        = 0x1C
 	LanServiceStatus                 = 0x1D
 	AllowStatusFrames                = 0x1E
@@ -143,6 +128,12 @@ const (
 	AttachedChannels                 = 0x2B
 	AllowEchoFrames                  = 0x2C
 	DevicePartNumber                 = 0x2D
+	HardResetStatus                  = 0x2E
+	LanChanDirection                 = 0x2F
+	DeviceGuid                       = 0x30
+	BitrateInfoCc                    = 0x31
+	BitrateInfoXl                    = 0x32
+	BusspeedXl                       = 0x33
 
 	ParamOff        = 0x00
 	ParamOn         = 0x01
@@ -162,21 +153,31 @@ const (
 	LogFnRead    = 0x10
 	LogFnAll     = 0xFFFF
 
-	TraceFileSingle    = 0x00
-	TraceFileSegmented = 0x01
-	TraceFileDate      = 0x02
-	TraceFileTime      = 0x04
-	TraceFileOverwrite = 0x80
+	TraceFileSingle     = 0x00
+	TraceFileSegmented  = 0x01
+	TraceFileDate       = 0x02
+	TraceFileTime       = 0x04
+	TraceFileOverwrite  = 0x80
+	TraceFileDataLength = 0x100
 
 	FeatureFdCapable    = 0x01
 	FeatureDelayCapable = 0x02
 	FeatureIoCapable    = 0x04
+	FeatureXlCapable    = 0x08
 
 	ServiceStatusStopped = 0x01
 	ServiceStatusRunning = 0x04
 
+	LanDirectionRead      = 0x01
+	LanDirectionWrite     = 0x02
+	LanDirectionReadWrite = (LanDirectionRead | LanDirectionWrite)
+
 	MaxLengthHardwareName  = 33
 	MaxLengthVersionString = 256
+	MaxLengthDataXl        = 2048
+	MaxValueStdId          = 0x7FF
+	MaxValueExtId          = 0x1FFFFFFF
+	MaxValuePriorityId     = 0x7FF
 
 	MsgStandard = 0x00
 	MsgRtr      = 0x01
@@ -188,32 +189,16 @@ const (
 	MsgErrframe = 0x40
 	MsgStatus   = 0x80
 
+	MsgXl                = 0x100
+	MsgProtocolException = 0x200
+	MsgErrnotification   = 0x400
+
 	LookupDeviceType       = "devicetype"
 	LookupDeviceId         = "deviceid"
 	LookupControllerNumber = "controllernumber"
 	LookupIpAddress        = "ipaddress"
+	LookupDeviceGuid       = "deviceguid"
 
 	ModeStandard = MsgStandard
 	ModeExtended = MsgExtended
-
-	BR_CLOCK       = "f_clock"
-	BR_CLOCK_MHZ   = "f_clock_mhz"
-	BR_NOM_BRP     = "nom_brp"
-	BR_NOM_TSEG1   = "nom_tseg1"
-	BR_NOM_TSEG2   = "nom_tseg2"
-	BR_NOM_SJW     = "nom_sjw"
-	BR_NOM_SAMPLE  = "nom_sam"
-	BR_DATA_BRP    = "data_brp"
-	BR_DATA_TSEG1  = "data_tseg1"
-	BR_DATA_TSEG2  = "data_tseg2"
-	BR_DATA_SJW    = "data_sjw"
-	BR_DATA_SAMPLE = "data_ssp_offset"
-
-	TypeISA         HwType = 0x01
-	TypeISA_SJA     HwType = 0x09
-	TypeISA_PHYTEC  HwType = 0x04
-	TypeDNG         HwType = 0x02
-	TypeDNG_EPP     HwType = 0x03
-	TypeDNG_SJA     HwType = 0x05
-	TypeDNG_SJA_EPP HwType = 0x06
 )

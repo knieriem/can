@@ -48,8 +48,7 @@ func (b *bus) canAutoDetect() bool {
 }
 
 const (
-	pnp   = true
-	nopnp = false
+	pnp = true
 )
 
 var hwList = busList{
@@ -63,6 +62,14 @@ var hwList = busList{
 			api.USBBUS6,
 			api.USBBUS7,
 			api.USBBUS8,
+			api.USBBUS9,
+			api.USBBUS10,
+			api.USBBUS11,
+			api.USBBUS12,
+			api.USBBUS13,
+			api.USBBUS14,
+			api.USBBUS15,
+			api.USBBUS16,
 		},
 	}, {
 		"pci", pnp, []api.Handle{
@@ -74,26 +81,6 @@ var hwList = busList{
 			api.PCIBUS6,
 			api.PCIBUS7,
 			api.PCIBUS8,
-		},
-	}, {
-		"pcc", pnp, []api.Handle{
-			api.PCCBUS1,
-			api.PCCBUS2,
-		},
-	}, {
-		"dng", nopnp, []api.Handle{
-			api.DNGBUS1,
-		},
-	}, {
-		"isa", nopnp, []api.Handle{
-			api.ISABUS1,
-			api.ISABUS2,
-			api.ISABUS3,
-			api.ISABUS4,
-			api.ISABUS5,
-			api.ISABUS6,
-			api.ISABUS7,
-			api.ISABUS8,
 		},
 	},
 }

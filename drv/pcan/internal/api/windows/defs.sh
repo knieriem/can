@@ -26,7 +26,7 @@ defs_windows() {
 
 defs() {
 	header
-	grep Baud
+	grep Baud | sed '/Baud1M/i\\'
 	echo ')'
 }
 

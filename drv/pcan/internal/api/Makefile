@@ -18,7 +18,10 @@ LINAPIFILES=	\
 	zmethods_linux.go\
 	,,lintypes.go\
 
-all:	zfiles unify
+all:	go-generate zfiles unify
+
+go-generate:
+	go generate
 
 zfiles: \
 	$(ZFILESWIN)\
@@ -66,4 +69,7 @@ nuke: clean
 	rm -f z*.go
 
 
-.PHONY: all clean nuke
+.PHONY: all clean nuke \
+	go-generate \
+	zfiles \
+	unify \

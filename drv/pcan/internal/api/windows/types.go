@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build ignore
+//go:build ignore
 
 package api
-
 
 /*
 #include "windows.h"
@@ -16,7 +15,7 @@ package api
 import "C"
 
 type MsgType C.TPCANMessageType
-type HwType C.TPCANType
+type HwType C.TPCANDevice
 type Baudrate C.TPCANBaudrate
 type Handle C.TPCANHandle
 type Mode C.TPCANMode

@@ -16,6 +16,7 @@ $2 ~ /TYPE_/ { type = "HwType"}
 /PCAN-.* interface, channel/ {sub("PCAN-", "", $5)}
 
 proc && /Deprecated/ { next }
+proc && /BR_/ { next }
 
 proc && /#define/{
 	if ($0 ~ "__T\\(") {
@@ -52,6 +53,12 @@ proc && /#define/{
 	if ($3 ~ "0x.*U") {
 		sub("U$", "", $3)
 	}
+		if ($3 ~ /.*LAN_DIREC.*/) {
+			gsub("LAN_", "Lan", $0)
+			gsub("DIRECTION_", "Direction", $0)
+			gsub("READ", "Read", $0)
+			gsub("WRITE", "Write", $0)
+		}
 		if ($3 ~ /.*CHANNEL_.*/) {
 			gsub("CHANNEL_", "Chan", $0)
 			gsub("AVAILABLE", "Available", $0)

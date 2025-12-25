@@ -1,6 +1,8 @@
 package api
 
 const (
+	BitrateInfoBtr = 0x18
+
 	Baud1M   = 0x0014
 	Baud800K = 0x0016
 	Baud500K = 0x001C
