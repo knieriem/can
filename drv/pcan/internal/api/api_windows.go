@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 //sys initialize(h Handle, btr0btr1 Baudrate, hw HwType, ioport uint32, intr uint16) (status Status) = pcanbasic.CAN_Initialize
@@ -78,7 +80,7 @@ func (p BoolPar) set(h Handle, i interface{}) Status {
 }
 
 func (p HandlePar) set(h Handle, i interface{}) Status {
-	v := i.(syscall.Handle)
+	v := i.(windows.Handle)
 	return setValue(h, byte(p), uintptr(unsafe.Pointer(&v)), unsafe.Sizeof(v))
 }
 

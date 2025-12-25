@@ -15,7 +15,7 @@ import (
 
 	"github.com/knieriem/can"
 	"github.com/knieriem/can/drv/pcan/internal/api"
-	win "github.com/knieriem/g/syscall"
+	"golang.org/x/sys/windows"
 )
 
 func driverPresent() bool {
@@ -90,7 +90,7 @@ type dev struct {
 	h       api.Handle
 	bus     *bus
 	receive struct {
-		ev     syscall.Handle
+		ev     windows.Handle
 		status api.Status
 		t0     can.Time
 		t0val  int64
@@ -128,7 +128,7 @@ func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error)
 	}
 	h := b.channels[i]
 
-	if d.receive.ev, err = win.CreateEvent(!win.EvManualReset, !win.EvInitiallyOn); err != nil {
+	if d.receive.ev, err = windows.CreateEvent(nil, 0, 0, nil); err != nil {
 		return
 	}
 
@@ -244,7 +244,7 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 			return
 		}
 		if block {
-			ev, err1 := syscall.WaitForSingleObject(d.receive.ev, syscall.INFINITE)
+			ev, err1 := windows.WaitForSingleObject(d.receive.ev, windows.INFINITE)
 			switch ev {
 			case syscall.WAIT_OBJECT_0:
 				hasBlocked = true
@@ -286,8 +286,8 @@ retry:
 
 func (d *dev) Close() (err error) {
 	err = d.h.Uninitialize().Err()
-	win.SetEvent(d.receive.ev)
-	syscall.CloseHandle(d.receive.ev)
+	windows.SetEvent(d.receive.ev)
+	windows.CloseHandle(d.receive.ev)
 	wrapErr("close", &err)
 	return
 }
