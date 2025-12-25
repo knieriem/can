@@ -12,39 +12,43 @@ import (
 	"unsafe"
 )
 
-//sys	initialize(h Handle, btr0btr1 Baudrate, hw HwType, ioport uint32, intr uint16) (status Status) = pcanbasic.CAN_Initialize
+//sys initialize(h Handle, btr0btr1 Baudrate, hw HwType, ioport uint32, intr uint16) (status Status) = pcanbasic.CAN_Initialize
+//sys uninitialize(h Handle) (status Status) = pcanbasic.CAN_Uninitialize
+
+//sys reset(h Handle) (status Status) = pcanbasic.CAN_Reset
+//sys status(h Handle) (status Status) = pcanbasic.CAN_GetStatus
+
+//sys readMsg(h Handle, buf *Msg, ts *TimeStamp) (status Status) = pcanbasic.CAN_Read
+//sys writeMsg(h Handle, buf *Msg) (status Status) = pcanbasic.CAN_Write
+
+//sys filterMsgs(h Handle, fromID uint32, toID uint32, mode Mode) (status Status) = pcanbasic.CAN_FilterMessages
+
+//sys getValue(h Handle, p byte, buf uintptr, size uintptr) (s Status) = pcanbasic.CAN_GetValue
+//sys setValue(h Handle, p byte, buf uintptr, size uintptr) (s Status) = pcanbasic.CAN_SetValue
+
 func (h Handle) Initialize(btr0btr1 Baudrate, hw HwType, ioPort uint32, intr uint16) Status {
 	return initialize(h, btr0btr1, hw, ioPort, intr)
 }
 
-//sys uninitialize(h Handle) (status Status) = pcanbasic.CAN_Uninitialize
 func (h Handle) Uninitialize() Status {
 	return uninitialize(h)
 }
 
-//sys reset(h Handle) (status Status) = pcanbasic.CAN_Reset
 func (h Handle) Reset() Status {
 	return reset(h)
 }
 
-//sys status(h Handle) (status Status) = pcanbasic.CAN_GetStatus
 func (h Handle) Status() Status {
 	return status(h)
 }
 
-//sys	readMsg(h Handle, buf *Msg, ts *TimeStamp) (status Status) = pcanbasic.CAN_Read
 func (h Handle) ReadMsg(m *Msg, ts *TimeStamp) Status {
 	return readMsg(h, m, ts)
 }
 
-//sys	writeMsg(h Handle, buf *Msg) (status Status) = pcanbasic.CAN_Write
 func (h Handle) WriteMsg(m *Msg) Status {
 	return writeMsg(h, m)
 }
-
-//sys filterMsgs(h Handle, fromID uint32, toID uint32, mode Mode) (status Status) = pcanbasic.CAN_FilterMessages
-
-//sys setValue(h Handle, p byte, buf uintptr, size uintptr) (s Status) = pcanbasic.CAN_SetValue
 
 type setter interface {
 	set(Handle, interface{}) Status
@@ -77,8 +81,6 @@ func (p HandlePar) set(h Handle, i interface{}) Status {
 	v := i.(syscall.Handle)
 	return setValue(h, byte(p), uintptr(unsafe.Pointer(&v)), unsafe.Sizeof(v))
 }
-
-//sys getValue(h Handle, p byte, buf uintptr, size uintptr) (s Status) = pcanbasic.CAN_GetValue
 
 func (h Handle) StringVal(p StringPar) (s string, st Status) {
 	var buf = make([]byte, 256)
