@@ -49,6 +49,9 @@ func (*driver) Name() string {
 }
 
 func timingConf(c *can.Config) (tc uint16, err error) {
+	if c == nil {
+		return defaultBitrate, nil
+	}
 	if v := c.Nominal.Bitrate; v != 0 {
 		if tc, ok := builtinBitrates[v]; ok {
 			return tc, nil

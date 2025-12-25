@@ -141,14 +141,12 @@ func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error)
 		return
 	}
 
-	if conf != nil {
-		bitrate, err := timingConf(conf)
-		if err != nil {
-			return nil, err
-		}
-		if err = h.Initialize(api.Baudrate(bitrate), 0, 0, 0).Err(); err != nil {
-			return nil, err
-		}
+	bitrate, err := timingConf(conf)
+	if err != nil {
+		return nil, err
+	}
+	if err = h.Initialize(api.Baudrate(bitrate), 0, 0, 0).Err(); err != nil {
+		return nil, err
 	}
 
 	if err = h.SetValue(api.BusoffAutoreset, true).Err(); err != nil {
