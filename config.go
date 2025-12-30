@@ -449,3 +449,55 @@ func (enc *configEncoder) addOptBool(key string, opt Optional[bool]) {
 	}
 	enc.buf = append(enc.buf, s)
 }
+
+// Resolve interprets a BitTimingConfig.
+//
+// If a bitrate and (optionally) a sample point are specified,
+// it calculates a [timing.BitTiming], taking fOsc and dev into account.
+//
+// If, instead, the BitTiming field is provided, it validates and, if
+// necessary, fills in the Tq or Prescaler fields.
+//
+// The result is stored into dest if dest is non-nil; otherwise,
+// the receiver btc is modified in-place.
+func (btc *BitTimingConfig) Resolve(dest *BitTimingConfig, fOsc uint32, dev *timing.DevSpec) error {
+	if dest == nil {
+		dest = btc
+	}
+	if btc.Tq != 0 {
+		ps := btc.Tq * time.Duration(fOsc)
+		ps = (ps + time.Second/2 - 1) / time.Second
+		if dest != btc {
+			*dest = *btc
+		}
+		if btc.Prescaler != 0 {
+			if ps != time.Duration(btc.Prescaler) {
+				return errors.New("prescaler mismatch")
+			}
+		} else {
+			dest.Prescaler = int(ps)
+		}
+		return nil
+	}
+	if btc.PropSeg != 0 {
+		// Tq is zero
+		num := time.Second * time.Duration(btc.Prescaler)
+		if dest != btc {
+			*dest = *btc
+		}
+		dest.Tq = (num + time.Duration(fOsc)/2 - 1) / time.Duration(fOsc)
+		return nil
+	}
+	if btc.Bitrate == 0 {
+		return errors.New("bitrate not found")
+	}
+	t, err := timing.CalcBitTiming(fOsc, btc.Bitrate, btc.SamplePoint, dev, timing.PreferLowerPrescaler())
+	if err != nil {
+		return err
+	}
+	t.SJW = btc.SJW
+	t.ConstrainSJW(dev.SJWMax)
+	dest.BitTiming = *t
+	dest.Tq = t.CalcTq(fOsc)
+	return nil
+}
