@@ -1,4 +1,5 @@
 //go:generate sh internal/linux/gen.sh internal/linux
+//go:build linux
 
 package socketcan
 

@@ -7,3 +7,13 @@ import (
 )
 
 var Driver = can.UnsupportedDriver
+
+func NewDriver(...DriverOption) can.Driver {
+	return Driver
+}
+
+type DriverOption func()
+
+func WithPrivilegedUtil() DriverOption {
+	return nil
+}
