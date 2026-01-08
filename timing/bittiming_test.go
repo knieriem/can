@@ -9,13 +9,9 @@ import (
 	"github.com/knieriem/can/timing/dev"
 )
 
-type device struct {
-	fOsc uint32
-	spec *timing.DevSpec
-}
-
 type test struct {
-	dev     *device
+	dev     *timing.Controller
+	constr  *timing.Constraints
 	fOsc    uint32
 	bitrate uint32
 	sp      timing.SamplePoint
@@ -34,7 +30,7 @@ type test struct {
 var tests = []test{
 	{
 		// example from: https: //ww1.microchip.com/downloads/en/DeviceDoc/MCP2515-Stand-Alone-CAN-Controller-with-SPI-20001801J.pdf#page=43
-		dev:     &mcp2515,
+		dev:     dev.MCP2515,
 		fOsc:    20e6,
 		bitrate: 125e3,
 		sp:      625,
@@ -50,14 +46,14 @@ var tests = []test{
 		},
 		cmpTSeg1: true,
 	}, {
-		dev:     &mcp2515,
+		dev:     dev.MCP2515,
 		bitrate: 500e3,
 		sp:      875,
 		regs: &timing.RegValue{
 			Reg8: []uint8{0, 0xb5, 1},
 		},
 	}, {
-		dev:     &mcp2515,
+		dev:     dev.MCP2515,
 		bitrate: 1000e3,
 		sp:      875,
 		sjw:     3,
@@ -65,7 +61,7 @@ var tests = []test{
 			Reg8: []uint8{0x40, 0x91, 1},
 		},
 	}, {
-		dev:     &mcp2518fd,
+		dev:     dev.MCP2518FD,
 		bitrate: 500e3,
 		opts: []timing.CalcOption{
 			timing.PreferLowerPrescaler(),
@@ -79,7 +75,8 @@ var tests = []test{
 		},
 		tq: 25 * time.Nanosecond,
 	}, {
-		dev:     &mcp2518fdData,
+		dev:     dev.MCP2518FD,
+		constr:  dev.MCP2518FD.Data,
 		bitrate: 1e6,
 		sp:      750,
 		opts: []timing.CalcOption{
@@ -93,38 +90,18 @@ var tests = []test{
 			SJW:       1,
 		},
 	}, {
-		dev:     &lpc21xx,
+		dev:     dev.LPC21xx,
 		bitrate: 250e3,
 		regs:    &timing.RegValue{Reg32: 0x1b0003},
 	}, {
-		dev:     &lpc21xx,
+		dev:     dev.LPC21xx,
 		bitrate: 500e3,
 		regs:    &timing.RegValue{Reg32: 0x1b0001},
 	}, {
-		dev:     &lpc21xx,
+		dev:     dev.LPC21xx,
 		bitrate: 1e6,
 		regs:    &timing.RegValue{Reg32: 0x1b0000},
 	},
-}
-
-var mcp2515 = device{
-	fOsc: 16e6,
-	spec: dev.MCP2515,
-}
-
-var mcp2518fd = device{
-	fOsc: 40e6,
-	spec: &dev.MCP2518FD.Nominal,
-}
-
-var mcp2518fdData = device{
-	fOsc: 40e6,
-	spec: &dev.MCP2518FD.Data,
-}
-
-var lpc21xx = device{
-	fOsc: 15e6,
-	spec: dev.LPC21xx,
 }
 
 func TestCalc(t *testing.T) {
@@ -132,31 +109,39 @@ func TestCalc(t *testing.T) {
 		test := &tests[i]
 		dev := test.dev
 
-		fOsc := dev.fOsc
+		fOsc := dev.Clock
 		if f := test.fOsc; f != 0 {
 			fOsc = f
 		}
-		bt, err := timing.CalcBitTiming(fOsc, test.bitrate, test.sp, dev.spec, test.opts...)
+		spec := test.constr
+		if test.constr == nil {
+			spec = &dev.Nominal
+		}
+		opts := test.opts
+		if div := dev.ClockDiv; div != 0 {
+			opts = append(opts, timing.ClockDiv(div))
+		}
+		bt, err := timing.CalcBitTiming(fOsc, test.bitrate, test.sp, spec, opts...)
 		if err != nil {
 			t.Error(err)
 			continue
 		}
 		bt.SJW = test.sjw
-		bt.ConstrainSJW(dev.spec.SJWMax)
+		bt.ConstrainSJW(spec.SJWMax)
 		if test.bt != nil {
 			if !bitTimingsEqual(test.bt, bt, test.cmpTSeg1) {
 				t.Errorf("test %d: timing mismatch %#v != %#v", i, test.bt, bt)
 			}
 		}
 		if x := test.regs; x != nil {
-			r := dev.spec.EncodeToReg(bt)
+			r := spec.EncodeToReg(bt)
 			if !regValueEquals(r, x) {
 				t.Errorf("test %d: reg mismatch: %v != %v", i, r, x)
 			}
 		}
 		if xTq := test.tq; xTq != 0 {
 			f := fOsc
-			if div := dev.spec.FOscDiv; div != 0 {
+			if div := dev.ClockDiv; div != 0 {
 				f = f / uint32(div)
 			}
 			if tq := bt.CalcTq(f); tq != xTq {

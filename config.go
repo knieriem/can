@@ -460,12 +460,12 @@ func (enc *configEncoder) addOptBool(key string, opt Optional[bool]) {
 //
 // The result is stored into dest if dest is non-nil; otherwise,
 // the receiver btc is modified in-place.
-func (btc *BitTimingConfig) Resolve(dest *BitTimingConfig, fOsc uint32, dev *timing.DevSpec) error {
+func (btc *BitTimingConfig) Resolve(dest *BitTimingConfig, clock uint32, cstr *timing.Constraints) error {
 	if dest == nil {
 		dest = btc
 	}
 	if btc.Tq != 0 {
-		ps := btc.Tq * time.Duration(fOsc)
+		ps := btc.Tq * time.Duration(clock)
 		ps = (ps + time.Second/2 - 1) / time.Second
 		if dest != btc {
 			*dest = *btc
@@ -485,19 +485,19 @@ func (btc *BitTimingConfig) Resolve(dest *BitTimingConfig, fOsc uint32, dev *tim
 		if dest != btc {
 			*dest = *btc
 		}
-		dest.Tq = (num + time.Duration(fOsc)/2 - 1) / time.Duration(fOsc)
+		dest.Tq = (num + time.Duration(clock)/2 - 1) / time.Duration(clock)
 		return nil
 	}
 	if btc.Bitrate == 0 {
 		return errors.New("bitrate not found")
 	}
-	t, err := timing.CalcBitTiming(fOsc, btc.Bitrate, btc.SamplePoint, dev, timing.PreferLowerPrescaler())
+	t, err := timing.CalcBitTiming(clock, btc.Bitrate, btc.SamplePoint, cstr, timing.PreferLowerPrescaler())
 	if err != nil {
 		return err
 	}
 	t.SJW = btc.SJW
-	t.ConstrainSJW(dev.SJWMax)
+	t.ConstrainSJW(cstr.SJWMax)
 	dest.BitTiming = *t
-	dest.Tq = t.CalcTq(fOsc)
+	dest.Tq = t.CalcTq(clock)
 	return nil
 }

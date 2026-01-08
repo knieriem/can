@@ -31,6 +31,7 @@ type CalcOption func(*calcConf)
 type calcConf struct {
 	preferLowerPrescaler bool
 	alignPhSeg1PhSeg2    bool
+	clockDiv             int
 }
 
 func PreferLowerPrescaler() CalcOption {
@@ -45,12 +46,18 @@ func AlignPhSeg1PhSeg2() CalcOption {
 	}
 }
 
+func ClockDiv(div int) CalcOption {
+	return func(conf *calcConf) {
+		conf.clockDiv = div
+	}
+}
+
 // CalcBitTiming calculates a bit timing with the desired location of the
 // sample point for the given oscillator frequency and bitrate.
 // Zero values may be used for the sample point and
 // for the resynchronization jump width (sjw),
 // in which case sp=87.5 % and sjw=1 are substituted.
-func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, dev *DevSpec, opts ...CalcOption) (t *BitTiming, err error) {
+func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, dev *Constraints, opts ...CalcOption) (t *BitTiming, err error) {
 	var conf calcConf
 
 	for _, o := range opts {
@@ -63,8 +70,8 @@ func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, dev *DevSpec, opts ...C
 	incr := minVal(dev.PrescalerIncr)
 
 	nq0 := fOsc / bitrate
-	if dev.FOscDiv != 0 {
-		nq0 /= uint32(dev.FOscDiv)
+	if conf.clockDiv != 0 {
+		nq0 /= uint32(conf.clockDiv)
 	}
 
 	sp.setupLazy(bitrate)
@@ -141,7 +148,7 @@ func minVal(v int) int {
 	return max(1, v)
 }
 
-func (dev *DevSpec) SplitTSeg1(tseg1, ps1start int) (prop, ps1 int) {
+func (dev *Constraints) SplitTSeg1(tseg1, ps1start int) (prop, ps1 int) {
 	ps1 = ps1start
 
 	// propSeg gets the remaining tqs
@@ -165,7 +172,7 @@ func (dev *DevSpec) SplitTSeg1(tseg1, ps1start int) (prop, ps1 int) {
 	return
 }
 
-func (dev *DevSpec) constrainPhSeg2(ps2 int) int {
+func (dev *Constraints) constrainPhSeg2(ps2 int) int {
 	minPhSeg2 := minVal(dev.TSeg2Min)
 
 	if ps2 < minPhSeg2 {

@@ -30,12 +30,12 @@ type BitTiming struct {
 	SJW int
 }
 
-// DevSpec defines device specific limits and properties.
+// Constraints defines device specific limits and properties.
 // CAN bit timing configuration registers of a specific device
 // allow values for the time segments, the prescaler, and sjw
 // within defined ranges only, dependent on the number of bits
 // available for each value.
-type DevSpec struct {
+type Constraints struct {
 	PropSegMax int
 	TSeg1Min   int
 	TSeg1Max   int
@@ -48,20 +48,23 @@ type DevSpec struct {
 	PrescalerMax  int
 	PrescalerIncr int
 
-	// FOscDiv allows to specify an extra divider. In some devices, like MCP2515,
-	// fOsc is divided by two, before being fed to the prescaler; in this case,
-	// a value of 2 should be assigned to this field.
-	FOscDiv int
-
 	EncodeToReg func(*BitTiming) *RegValue
 	DecodeReg   func(*RegValue) *BitTiming
 }
 
-// DevSpecFD contains the device specific limits for the
+// Controller contains the device specific limits for the
 // bit timings of the nominal and data bitrates.
-type DevSpecFD struct {
-	Nominal DevSpec
-	Data    DevSpec
+type Controller struct {
+	// Clock is the Controller's default clock frequency
+	Clock uint32
+
+	// ClockDiv allows to specify an extra divider. In some devices, like MCP2515,
+	// fOsc is divided by two, before being fed to the prescaler; in this case,
+	// a value of 2 should be assigned to this field.
+	ClockDiv int
+
+	Nominal Constraints
+	Data    *Constraints
 }
 
 // RegValue contains the bit timing value encoded into
@@ -88,7 +91,7 @@ func (r *RegValue) String() string {
 
 // NqMax returns the maxmimum number of time quanta that
 // can be used on a specific device.
-func (dev *DevSpec) NqMax() int {
+func (dev *Constraints) NqMax() int {
 	return 1 + dev.TSeg1Max + dev.TSeg2Max
 }
 
