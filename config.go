@@ -465,13 +465,12 @@ func (btc *BitTimingConfig) Resolve(dest *BitTimingConfig, clock uint32, cstr *t
 		dest = btc
 	}
 	if btc.Tq != 0 {
-		ps := btc.Tq * time.Duration(clock)
-		ps = (ps + time.Second/2 - 1) / time.Second
+		ps := int((btc.Tq*time.Duration(clock) + time.Second/2 - 1) / time.Second)
 		if dest != btc {
 			*dest = *btc
 		}
 		if btc.Prescaler != 0 {
-			if ps != time.Duration(btc.Prescaler) {
+			if ps != btc.Prescaler {
 				return errors.New("prescaler mismatch")
 			}
 		} else {
