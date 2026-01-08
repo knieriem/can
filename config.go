@@ -397,7 +397,7 @@ func (c *BitTimingConfig) String() string {
 			sp = "@." + fmt.Sprintf("%03d", c.SamplePoint)
 			sp = strings.TrimRight(sp, "0")
 		}
-		return formatBitrate(b) + sp + sjw
+		return FormatBitrate(b) + sp + sjw
 	}
 
 	x := ""
@@ -410,7 +410,7 @@ func (c *BitTimingConfig) String() string {
 	return x + sjw
 }
 
-func formatBitrate(b uint32) string {
+func FormatBitrate(b uint32) string {
 	suffix := ""
 	if b%1e6 == 0 {
 		suffix = "M"
