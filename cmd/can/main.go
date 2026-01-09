@@ -21,6 +21,7 @@ func main() {
 	tool.Commands = []*tool.Command{
 		tool.CmdVersion,
 		cmdLsDev,
+		cmdWrite,
 		cmdServe,
 	}
 	tool.Run()

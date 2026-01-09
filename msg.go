@@ -4,7 +4,12 @@
 
 package can
 
-import "errors"
+import (
+	"encoding/hex"
+	"errors"
+	"strconv"
+	"strings"
+)
 
 // Message Flags.
 type Flags int
@@ -107,3 +112,70 @@ func VerifyDataLenFD(n int) (next int, needsFD bool, err error) {
 var ErrInvalidMsgLen = errors.New("invalid message length")
 
 var ErrMsgCapExceeded = errors.New("message capacity too small")
+
+// FromExpr parses a CAN message expression string and stores the
+// result into m, which may be a pre-initialized value.
+// The format is similar to the format used by cansend from can-utils.
+//
+// CAN ID and data, separated by '#' or ':', must be specified in
+// hexadecimal format. An FD frame can be forced using a double separator,
+// followed by a CAN flags hex nibble; supported FD flags: BRS = 0b0001.
+//
+// The string may not contain white-space, but '.' can be used to
+// separate data bytes.
+func (m *Msg) FromExpr(expr string) error {
+	if i := strings.IndexAny(expr, "#:"); i != -1 {
+		sep := expr[i]
+		sID := expr[:i]
+		if sID != "" {
+			if len(sID) > 3 {
+				m.Flags |= ExtFrame
+			}
+			id, err := strconv.ParseUint(sID, 16, 32)
+			if err != nil {
+				return err
+			}
+			m.Id = uint32(id)
+		}
+
+		expr = expr[i+1:]
+		if len(expr) == 0 {
+			return nil
+		}
+		if expr[0] == sep {
+			m.Flags |= ForceFD
+			expr = expr[1:]
+			if expr == "" {
+				return errors.New("CAN FD flags value missing")
+			}
+			u, err := strconv.ParseInt(expr[:1], 16, 8)
+			if err != nil {
+				return err
+			}
+			if u&1 != 0 {
+				m.Flags |= FDSwitchBitrate
+			}
+			expr = expr[1:]
+		}
+		if expr == "R" {
+			m.Flags |= RTRMsg
+			return nil
+		}
+	}
+	expr = dots.Replace(expr)
+	data := m.Data()
+	n := hex.DecodedLen(len(expr))
+	if n > cap(data) {
+		data = make([]byte, n)
+	} else {
+		data = data[:n]
+	}
+	_, err := hex.Decode(data, []byte(expr))
+	if err != nil {
+		return err
+	}
+	m.SetData(data)
+	return nil
+}
+
+var dots = strings.NewReplacer(".", "")
