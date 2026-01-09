@@ -22,6 +22,7 @@ func main() {
 		tool.CmdVersion,
 		cmdLsDev,
 		cmdWrite,
+		cmdBittiming,
 		cmdServe,
 	}
 	tool.Run()

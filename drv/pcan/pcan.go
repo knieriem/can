@@ -12,6 +12,7 @@ import (
 	"github.com/knieriem/can"
 	"github.com/knieriem/can/drv"
 	api "github.com/knieriem/can/drv/pcan/internal/api"
+	"github.com/knieriem/can/timing"
 )
 
 const (
@@ -46,6 +47,23 @@ type driver struct {
 
 func (*driver) Name() string {
 	return "pcan"
+}
+
+var DevSpecFD = timing.Controller{
+	Nominal: timing.Constraints{
+		TSeg1Max:     256,
+		TSeg2Max:     128,
+		SJWMax:       128,
+		PrescalerMin: 1,
+		PrescalerMax: 1024,
+	},
+	Data: &timing.Constraints{
+		TSeg1Max:     32,
+		TSeg2Max:     16,
+		SJWMax:       16,
+		PrescalerMin: 1,
+		PrescalerMax: 1024,
+	},
 }
 
 func timingConf(c *can.Config) (tc uint16, err error) {

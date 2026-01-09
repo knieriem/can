@@ -26,6 +26,10 @@ func (sp SamplePoint) phSeg2(nq int) int {
 	return ((1000-int(sp))*nq + 500) / 1000
 }
 
+func (sp SamplePoint) Percent() float64 {
+	return float64(sp) / 10
+}
+
 type CalcOption func(*calcConf)
 
 type calcConf struct {
