@@ -18,7 +18,7 @@ import (
 )
 
 var cmdServe = &tool.Command{
-	UsageLine:    "serve [-t] addr [device]",
+	UsageLine:    "serve addr [device]",
 	Short:        "serve a CAN device on a tcp port",
 	Long:         ``,
 	ExtraArgsReq: 1,
