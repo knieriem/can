@@ -12,8 +12,6 @@ import (
 
 	"github.com/knieriem/can"
 	"github.com/knieriem/can/drv/canrpc"
-	_ "github.com/knieriem/can/drv/pcan"
-
 	"github.com/knieriem/tool"
 )
 
