@@ -11,7 +11,7 @@ import (
 var cmdLsDev = &tool.Command{
 	ExtraArgsMax: 1,
 	UsageLine:    "lsdev",
-	Short:        "list serial and CAN devices",
+	Short:        "list CAN devices",
 	Run:          runLsDev,
 }
 
