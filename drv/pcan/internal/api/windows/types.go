@@ -20,8 +20,10 @@ type Baudrate C.TPCANBaudrate
 type Handle C.TPCANHandle
 type Mode C.TPCANMode
 
-type Msg	C.TPCANMsg
+type Msg C.TPCANMsg
+type MsgFD C.TPCANMsgFD
 
-type TimeStamp	C.TPCANTimestamp
+type TimeStamp C.TPCANTimestamp
+type TimeStampFD C.TPCANTimestampFD
 
 type ChanInf C.TPCANChannelInformation

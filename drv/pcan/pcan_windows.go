@@ -5,18 +5,23 @@
 package pcan
 
 import (
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
+
+	"golang.org/x/sys/windows"
 
 	"github.com/knieriem/can"
+	"github.com/knieriem/can/drv"
+	"github.com/knieriem/can/drv/internal/canfd"
 	"github.com/knieriem/can/drv/pcan/internal/api"
-	"golang.org/x/sys/windows"
+	"github.com/knieriem/can/timing"
 )
 
 func driverPresent() bool {
@@ -106,6 +111,10 @@ type dev struct {
 		t0     can.Time
 		t0val  int64
 	}
+
+	msg    api.Msg
+	fdMsg  api.MsgFD
+	fdMode bool
 }
 
 func (*driver) Scan() (list []can.Name) {
@@ -139,10 +148,6 @@ func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error)
 	}
 	h := b.channels[i]
 
-	if d.receive.ev, err = windows.CreateEvent(nil, 0, 0, nil); err != nil {
-		return
-	}
-
 	if h.InUse() && !h.Available() {
 		err = errors.New("channel in use")
 		return
@@ -151,20 +156,37 @@ func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error)
 		err = errors.New("channel not available")
 		return
 	}
-
-	bitrate, err := timingConf(conf)
+	fdCapable := false
+	feat, st := h.IntVal(api.ChanFeatures)
+	if st == 0 {
+		if feat&api.FeatureFdCapable != 0 {
+			fdCapable = true
+		}
+	}
+	btr0btr1, btStr, err := prepareBittiming(conf, fdCapable)
 	if err != nil {
 		return nil, err
 	}
-	if err = h.Initialize(api.Baudrate(bitrate), 0, 0, 0).Err(); err != nil {
+	if btStr != "" {
+		if err = h.InitializeFD(btStr); err != nil {
+			return nil, err
+		}
+	} else if err = h.Initialize(api.Baudrate(btr0btr1), 0, 0, 0).Err(); err != nil {
 		return nil, err
 	}
 
 	if err = h.SetValue(api.BusoffAutoreset, true).Err(); err != nil {
+		h.Uninitialize()
+		return
+	}
+
+	if d.receive.ev, err = windows.CreateEvent(nil, 0, 0, nil); err != nil {
+		h.Uninitialize()
 		return
 	}
 
 	if err = h.SetValue(api.ReceiveEvent, d.receive.ev).Err(); err != nil {
+		h.Uninitialize()
 		return
 	}
 
@@ -174,9 +196,55 @@ func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error)
 		Driver:  "pcan",
 		Display: h.DisplayName(),
 	}
+	d.fdMode = btStr != ""
 
 	cd = d
 	return
+}
+
+func prepareBittiming(conf *can.Config, fdCapable bool) (tc uint16, btStr string, err error) {
+	if conf == nil {
+		return defaultBitrate, "", nil
+	}
+
+	fd := conf.IsFDMode()
+	if fd {
+		if !fdCapable {
+			return 0, "", errors.New("device is not FD capable")
+		}
+		var tmpBT can.BitTimingConfig
+		err := conf.Nominal.Resolve(&tmpBT, 80e6, &DevSpecFD.Nominal)
+		if err != nil {
+			return 0, "", err
+		}
+		sb := new(strings.Builder)
+		sb.WriteString("f_clock=80000000")
+		formatBitTiming(sb, &tmpBT.BitTiming, "nom")
+		if conf.Data.Valid {
+			err := conf.Data.Value.Resolve(&tmpBT, 80e6, DevSpecFD.Data)
+			if err != nil {
+				return 0, "", err
+			}
+			formatBitTiming(sb, &tmpBT.BitTiming, "data")
+		}
+		return 0, sb.String(), nil
+	}
+	if v := conf.Nominal.Bitrate; v != 0 {
+		if tc, ok := builtinBitrates[v]; ok {
+			return tc, "", nil
+		} else {
+			return 0, "", errors.New("bitrate not supported")
+		}
+	}
+	return defaultBitrate, "", nil
+}
+
+func formatBitTiming(w io.Writer, t *timing.BitTiming, prefix string) {
+	fmt.Fprintf(w, ",%s_brp=%d,%s_tseg1=%d,%s_tseg2=%d,%s_sjw=%d",
+		prefix, t.Prescaler,
+		prefix, t.PropSeg+t.PhaseSeg1,
+		prefix, t.PhaseSeg2,
+		prefix, t.SJW)
 }
 
 func (d *dev) Name() can.Name {
@@ -184,9 +252,6 @@ func (d *dev) Name() can.Name {
 }
 
 func (d *dev) Read(buf []can.Msg) (n int, err error) {
-	var m api.Msg
-	var ts api.TimeStamp
-
 	defer wrapErr("read", &err)
 
 	prevSt := d.receive.status
@@ -197,13 +262,21 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 	block := false
 	hasBlocked := false
 	for n < len(buf) {
-		st := d.h.ReadMsg(&m, &ts)
-
+		st := api.OK
+		err1 := d.readMsg(&buf[n])
+		if err1 != nil {
+			st2, ok := err1.(api.Status)
+			if !ok {
+				if n == 0 {
+					return 0, err1
+				}
+				return n, nil
+			}
+			st = st2
+		}
 	reEval:
 		switch {
 		case st == 0:
-			µs := int64(ts.Micros) + 1000*int64(ts.Millis) + 0xFFFFFFFF*1000*int64(ts.Overflow)
-			st = d.decode(&buf[n], &m, µs)
 			if st != 0 {
 				// It seems that this path is never entered, i.e. apparently
 				// ReadMsg won't return api.OK if it stored a status message into
@@ -270,29 +343,97 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 	return
 }
 
+func (d *dev) readMsg(m *can.Msg) error {
+	if d.fdMode {
+		var ts api.TimeStampFD
+		am := &d.fdMsg
+		st := d.h.ReadMsgFD(am, &ts)
+		if st != api.OK {
+			return st
+		}
+		return d.decode(m, am.ID, am.MSGTYPE, am.Data(), int64(ts))
+	}
+
+	var ts api.TimeStamp
+	am := &d.msg
+	st := d.h.ReadMsg(am, &ts)
+	if st != api.OK {
+		return st
+	}
+	µs := int64(ts.Micros) + 1000*int64(ts.Millis) + 0xFFFFFFFF*1000*int64(ts.Overflow)
+	return d.decode(m, am.ID, am.MSGTYPE, am.Data(), µs)
+}
+
+var msgFlagsMap = drv.FlagsMap{
+	{can.RTRMsg, api.MsgRtr},
+	{can.ExtFrame, api.MsgExtended},
+	{can.FDSwitchBitrate, api.MsgBrs},
+	{can.ForceFD, api.MsgFd},
+}
+
+func (d *dev) decode(dst *can.Msg, id uint32, msgType uint8, apiData []byte, µs int64) error {
+
+	if d.receive.t0 == 0 {
+		d.receive.t0 = can.Now()
+		d.receive.t0val = µs
+	}
+	dst.Rx.Time = d.receive.t0 + can.Time(µs-d.receive.t0val)
+
+	if msgType&api.MsgStatus != 0 {
+		st := api.Status(binary.BigEndian.Uint32(apiData))
+		dst.Flags = errFlagsMap.Decode(int(st))
+		dst.Flags |= can.StatusMsg
+		dst.Id = 0
+		dst.SetData(nil)
+		return st.Err()
+	}
+	dst.Id = id
+	dst.Flags = msgFlagsMap.Decode(int(msgType))
+	dstData := dst.Data()
+	if cap(dstData) < len(apiData) {
+		return can.ErrMsgCapExceeded
+	}
+	data := dstData[:len(apiData)]
+	copy(data, apiData)
+	dst.SetData(data)
+	return nil
+}
+
 func (d *dev) WriteMsg(cm *can.Msg) (err error) {
-	var m api.Msg
-
-	defer wrapErr("write", &err)
-
 	if cm.IsStatus() {
-		return
-	}
-	encode(&m, cm)
-
-retry:
-	st := d.h.WriteMsg(&m)
-	switch {
-	case st == 0:
-	case st.Test(api.ErrBUSOFF) || st.Test(api.ErrQXMTFULL):
-		// simulate blocking
-		time.Sleep(100 * time.Millisecond)
-		goto retry
-	default:
-		err = st
+		return nil
 	}
 
-	return
+	if d.fdMode {
+		var m api.MsgFD
+		encodeFD(&m, cm)
+		err = d.h.WriteMsgFD(&m).Err()
+	} else {
+		var m api.Msg
+		encode(&m, cm)
+		err = d.h.WriteMsg(&m).Err()
+	}
+	if err != nil {
+		wrapErr("write", &err)
+		return err
+	}
+	return nil
+}
+
+func encodeFD(dst *api.MsgFD, src *can.Msg) error {
+	dst.ID = src.Id
+	data := src.Data()
+	dlc, needsFD, err := canfd.DLC(len(data))
+	if err != nil {
+		return err
+	}
+	dst.DLC = dlc
+	dst.MSGTYPE = byte(msgFlagsMap.Encode(src.Flags))
+	if needsFD {
+		dst.MSGTYPE |= api.MsgFd
+	}
+	copy(dst.DATA[:], data)
+	return nil
 }
 
 func (d *dev) Close() (err error) {

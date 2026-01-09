@@ -16,12 +16,20 @@ type Msg struct {
 	DATA      [8]uint8
 	Pad_cgo_0 [2]byte
 }
+type MsgFD struct {
+	ID        uint32
+	MSGTYPE   uint8
+	DLC       uint8
+	DATA      [64]uint8
+	Pad_cgo_0 [2]byte
+}
 
 type TimeStamp struct {
 	Millis   uint32
 	Overflow uint16
 	Micros   uint16
 }
+type TimeStampFD uint64
 
 type ChanInf struct {
 	Channel_handle    uint16

@@ -42,6 +42,12 @@ func (bt *BitTimingConfig) isUnset() bool {
 	return bt.Bitrate == 0 && bt.BitTiming.PhaseSeg1 == 0
 }
 
+// IsFDMode returns true if either FDMode option is set or
+// a data bit timing, which implies fd mode, is specified.
+func (conf *Config) IsFDMode() bool {
+	return (conf.FDMode.Valid && conf.FDMode.Value) || conf.Data.Valid
+}
+
 // ParseConfSpecs parses CAN adapter configuration specifications.
 // The strings may contain space separated parameter settings.
 //

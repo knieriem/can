@@ -5,6 +5,7 @@
 package pcan
 
 import (
+	"encoding/binary"
 	"errors"
 	"io"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"syscall"
 
 	"github.com/knieriem/can"
+	"github.com/knieriem/can/drv"
 	"github.com/knieriem/can/drv/pcan/internal/api"
 	"github.com/knieriem/g/syscall/epoll"
 )
@@ -182,6 +184,36 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 			}
 		}
 	}
+	return
+}
+
+var msgFlagsMap = drv.FlagsMap{
+	{can.RTRMsg, api.MsgRtr},
+	{can.ExtFrame, api.MsgExtended},
+	{can.FDSwitchBitrate, api.MsgStatus},
+}
+
+func (d *dev) decode(dst *can.Msg, m *api.Msg, µs int64) (st api.Status) {
+
+	if d.receive.t0 == 0 {
+		d.receive.t0 = can.Now()
+		d.receive.t0val = µs
+	}
+	dst.Rx.Time = d.receive.t0 + can.Time(µs-d.receive.t0val)
+
+	if m.MSGTYPE&api.MsgStatus != 0 {
+		st = api.Status(binary.BigEndian.Uint32(m.DATA[0:4]))
+		dst.Flags = errFlagsMap.Decode(int(st))
+		dst.Flags |= can.StatusMsg
+		dst.Id = 0
+		dst.SetData(nil)
+		return
+	}
+	dst.Id = m.ID
+	dst.Flags = msgFlagsMap.Decode(int(m.MSGTYPE))
+	data := dst.Data()[:m.LEN]
+	copy(data, m.DATA[:])
+	dst.SetData(data)
 	return
 }
 

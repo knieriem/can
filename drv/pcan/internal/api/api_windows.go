@@ -11,17 +11,21 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/knieriem/can"
 	"golang.org/x/sys/windows"
 )
 
 //sys initialize(h Handle, btr0btr1 Baudrate, hw HwType, ioport uint32, intr uint16) (status Status) = pcanbasic.CAN_Initialize
+//sys initializeFD(h Handle, bitrateFD *byte) (status Status) = pcanbasic.CAN_InitializeFD
 //sys uninitialize(h Handle) (status Status) = pcanbasic.CAN_Uninitialize
 
 //sys reset(h Handle) (status Status) = pcanbasic.CAN_Reset
 //sys status(h Handle) (status Status) = pcanbasic.CAN_GetStatus
 
 //sys readMsg(h Handle, buf *Msg, ts *TimeStamp) (status Status) = pcanbasic.CAN_Read
+//sys readMsgFD(h Handle, buf *MsgFD, ts *TimeStampFD) (status Status) = pcanbasic.CAN_ReadFD
 //sys writeMsg(h Handle, buf *Msg) (status Status) = pcanbasic.CAN_Write
+//sys writeMsgFD(h Handle, buf *MsgFD) (status Status) = pcanbasic.CAN_WriteFD
 
 //sys filterMsgs(h Handle, fromID uint32, toID uint32, mode Mode) (status Status) = pcanbasic.CAN_FilterMessages
 
@@ -30,6 +34,15 @@ import (
 
 func (h Handle) Initialize(btr0btr1 Baudrate, hw HwType, ioPort uint32, intr uint16) Status {
 	return initialize(h, btr0btr1, hw, ioPort, intr)
+}
+
+func (h Handle) InitializeFD(bitrateFD string) error {
+	p0, err := syscall.BytePtrFromString(bitrateFD)
+	if err != nil {
+		return err
+	}
+
+	return initializeFD(h, p0).Err()
 }
 
 func (h Handle) Uninitialize() Status {
@@ -48,8 +61,39 @@ func (h Handle) ReadMsg(m *Msg, ts *TimeStamp) Status {
 	return readMsg(h, m, ts)
 }
 
+func (m *Msg) Data() []byte {
+	n := int(m.LEN)
+	if n > len(m.DATA) {
+		n = len(m.DATA)
+	}
+	return m.DATA[:n]
+}
+
+func (h Handle) ReadMsgFD(m *MsgFD, ts *TimeStampFD) Status {
+	return readMsgFD(h, m, ts)
+}
+
+func (m *MsgFD) Data() []byte {
+	n := int(m.DLC)
+	if n > 8 {
+		i := n - 9
+		if i >= len(can.ValidFDSizes) {
+			i = len(can.ValidFDSizes)
+		}
+		n = can.ValidFDSizes[i]
+	}
+	if n > len(m.DATA) {
+		return m.DATA[:]
+	}
+	return m.DATA[:n]
+}
+
 func (h Handle) WriteMsg(m *Msg) Status {
 	return writeMsg(h, m)
+}
+
+func (h Handle) WriteMsgFD(m *MsgFD) Status {
+	return writeMsgFD(h, m)
 }
 
 type setter interface {
@@ -198,7 +242,7 @@ func (err Status) Error() (s string) {
 
 	status := errorText(err, english, &buf[0])
 	if status == OK {
-		s = bufToString(buf)
+		s = windows.ByteSliceToString(buf)
 	} else {
 		s = fmt.Sprintf("CAN_GetErrorText failed (0x%02x)", status)
 	}

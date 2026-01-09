@@ -45,11 +45,14 @@ var (
 	procCAN_GetStatus      = modpcanbasic.NewProc("CAN_GetStatus")
 	procCAN_GetValue       = modpcanbasic.NewProc("CAN_GetValue")
 	procCAN_Initialize     = modpcanbasic.NewProc("CAN_Initialize")
+	procCAN_InitializeFD   = modpcanbasic.NewProc("CAN_InitializeFD")
 	procCAN_Read           = modpcanbasic.NewProc("CAN_Read")
+	procCAN_ReadFD         = modpcanbasic.NewProc("CAN_ReadFD")
 	procCAN_Reset          = modpcanbasic.NewProc("CAN_Reset")
 	procCAN_SetValue       = modpcanbasic.NewProc("CAN_SetValue")
 	procCAN_Uninitialize   = modpcanbasic.NewProc("CAN_Uninitialize")
 	procCAN_Write          = modpcanbasic.NewProc("CAN_Write")
+	procCAN_WriteFD        = modpcanbasic.NewProc("CAN_WriteFD")
 )
 
 func filterMsgs(h Handle, fromID uint32, toID uint32, mode Mode) (status Status) {
@@ -82,8 +85,20 @@ func initialize(h Handle, btr0btr1 Baudrate, hw HwType, ioport uint32, intr uint
 	return
 }
 
+func initializeFD(h Handle, bitrateFD *byte) (status Status) {
+	r0, _, _ := syscall.Syscall(procCAN_InitializeFD.Addr(), 2, uintptr(h), uintptr(unsafe.Pointer(bitrateFD)), 0)
+	status = Status(r0)
+	return
+}
+
 func readMsg(h Handle, buf *Msg, ts *TimeStamp) (status Status) {
 	r0, _, _ := syscall.Syscall(procCAN_Read.Addr(), 3, uintptr(h), uintptr(unsafe.Pointer(buf)), uintptr(unsafe.Pointer(ts)))
+	status = Status(r0)
+	return
+}
+
+func readMsgFD(h Handle, buf *MsgFD, ts *TimeStampFD) (status Status) {
+	r0, _, _ := syscall.Syscall(procCAN_ReadFD.Addr(), 3, uintptr(h), uintptr(unsafe.Pointer(buf)), uintptr(unsafe.Pointer(ts)))
 	status = Status(r0)
 	return
 }
@@ -108,6 +123,12 @@ func uninitialize(h Handle) (status Status) {
 
 func writeMsg(h Handle, buf *Msg) (status Status) {
 	r0, _, _ := syscall.Syscall(procCAN_Write.Addr(), 2, uintptr(h), uintptr(unsafe.Pointer(buf)), 0)
+	status = Status(r0)
+	return
+}
+
+func writeMsgFD(h Handle, buf *MsgFD) (status Status) {
+	r0, _, _ := syscall.Syscall(procCAN_WriteFD.Addr(), 2, uintptr(h), uintptr(unsafe.Pointer(buf)), 0)
 	status = Status(r0)
 	return
 }

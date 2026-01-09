@@ -105,7 +105,7 @@ const (
 	TraceSize                        = 0x13
 	TraceConfigure                   = 0x14
 	ChanIdentifying                  = 0x15
-	ChanFeatures                     = 0x16
+	ChanFeatures           IntPar    = 0x16
 	BitrateAdapting                  = 0x17
 	BitrateInfoFd                    = 0x19
 	BusspeedNominal                  = 0x1A
