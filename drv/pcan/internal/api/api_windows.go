@@ -12,6 +12,7 @@ import (
 	"unsafe"
 
 	"github.com/knieriem/can"
+	"github.com/knieriem/can/drv/pcan/internal/filter"
 	"golang.org/x/sys/windows"
 )
 
@@ -96,6 +97,42 @@ func (h Handle) WriteMsgFD(m *MsgFD) Status {
 	return writeMsgFD(h, m)
 }
 
+func (h Handle) FilterMsgs(filters []can.MsgFilter) error {
+
+	if len(filters) == 0 {
+		return nil
+	}
+
+	st := h.SetValue(MsgFilter, FilterClose)
+	if st != OK {
+		return st
+	}
+
+	f := make(filter.Filter, 0, len(filters))
+
+	f.Add(filters, false)
+	err := h.applyFilters(f, ModeStandard)
+	if err != nil {
+		return err
+	}
+
+	f = f[:0]
+	f.Add(filters, true)
+	return h.applyFilters(f, ModeExtended)
+}
+
+func (h Handle) applyFilters(filters filter.Filter, mode Mode) error {
+
+	for i := range filters {
+		iv := &filters[i]
+		st := filterMsgs(h, iv.Start, iv.End, mode)
+		if st != OK {
+			return st
+		}
+	}
+	return nil
+}
+
 type setter interface {
 	set(Handle, interface{}) Status
 }
@@ -108,6 +145,17 @@ type BoolPar byte
 type StringPar byte
 type IntPar byte
 type HandlePar byte
+
+func (p IntPar) set(h Handle, value interface{}) Status {
+	var v int32
+	switch x := value.(type) {
+	case int:
+		v = int32(x)
+	case int32:
+		v = x
+	}
+	return setValue(h, byte(p), uintptr(unsafe.Pointer(&v)), unsafe.Sizeof(v))
+}
 
 func (p StringPar) set(h Handle, i interface{}) Status {
 	buf := []byte(i.(string))

@@ -17,6 +17,8 @@ type Config struct {
 
 	Termination Optional[bool]
 	FDMode      Optional[bool]
+
+	MsgFilter []MsgFilter
 }
 
 type BitTimingConfig struct {
@@ -102,6 +104,25 @@ func (conf *Config) IsFDMode() bool {
 //		A boolean parameter deciding whether the CAN adapter should be run
 //		in CAN 2.0 mode or FD mode.
 //
+//	f - CAN message filter
+//
+//		A value has the form:  id ":" mask,
+//		where id and mask either consist of three characters (standard
+//		frame) or up to eight characters (extended frame), as in:
+//			f:123:7ff or f:123_4567:1fff_ffff
+//
+//		A short form can be used where only the id is specified and
+//		":" mask part is omitted. Within the id part, "-" may be used
+//		for a nibble that may contain any value from 0 to 0xF, as in:
+//			f:67-
+//		This would enable the receipt of messages with standard frame
+//		CAN IDs from 0x670 to 0x67F.
+//
+//		Multiple filters may be specified. The effect of a filter may
+//		be inverted by using a prefix "!" in front of the id part,
+//		like in "f!12-" (the example would avoid the reception of
+//		standard frames in the range 120 to 12F).
+//
 //	T - enable/disable termination resistor
 //
 //		This is a boolean parameter.
@@ -150,7 +171,7 @@ func (c *Config) fromSpec(s string) error {
 	iColon := indexColon(s)
 	key, value := s, "1"
 	if iColon == -1 {
-		if iInt := strings.IndexAny(s, "0123456789"); iInt != -1 {
+		if iInt := strings.IndexAny(s, "!0123456789"); iInt != -1 {
 			key, value = s[:iInt], s[iInt:]
 		} else if !slices.Contains(boolKeys, s) {
 			return fmt.Errorf("key not found: %q", s)
@@ -175,6 +196,12 @@ func (c *Config) fromSpec(s string) error {
 		if err != nil {
 			return err
 		}
+	case "f":
+		f, err := parseMsgFilter(value)
+		if err != nil {
+			return err
+		}
+		c.MsgFilter = append(c.MsgFilter, *f)
 	case "T":
 		err := parseBoolInt(&c.Termination, value)
 		if err != nil {
@@ -505,4 +532,116 @@ func (btc *BitTimingConfig) Resolve(dest *BitTimingConfig, clock uint32, cstr *t
 	dest.BitTiming = *t
 	dest.Tq = t.CalcTq(clock)
 	return nil
+}
+
+type MsgFilter struct {
+	ID       uint32
+	IDMask   uint32
+	ExtFrame bool
+	Invert   bool
+}
+
+func parseMsgFilter(v string) (*MsgFilter, error) {
+	var id, mask uint32
+	extFrame := false
+
+	v, invert := strings.CutPrefix(v, "!")
+	i := strings.IndexByte(v, ':')
+	if i != -1 {
+		n := len(v) - strings.Count(v, "_")
+		if n > 6+1 {
+			extFrame = true
+		}
+		u, err := strconv.ParseUint("0x"+v[:i], 0, 32)
+		if err != nil {
+			return nil, err
+		}
+		id = uint32(u)
+		u, err = strconv.ParseUint("0x"+v[i+1:], 0, 32)
+		if err != nil {
+			return nil, err
+		}
+		mask = uint32(u)
+	} else {
+		n := len(v)
+		nDigit := 0
+		pos := 0
+		for i := range n {
+			if pos > 28 {
+				return nil, errors.New("id range exceeded")
+			}
+			b := v[n-1-i:]
+			b = b[:1]
+			switch b[0] {
+			case '_':
+				if i == 4 {
+					continue
+				}
+				return nil, errors.New("syntax error")
+			case '-':
+				nDigit++
+				pos += 4
+				continue
+			}
+			u, err := strconv.ParseUint(b, 16, 8)
+			if err != nil {
+				return nil, err
+			}
+			nDigit++
+			id |= uint32(u) << pos
+			maskNibble := uint32(0xF)
+			if pos == 28 {
+				maskNibble = 1
+			}
+			mask |= maskNibble << pos
+			pos += 4
+		}
+		if nDigit > 3 {
+			extFrame = true
+		}
+	}
+	// mask must contain id
+	if mask|id != mask {
+		return nil, errors.New("id not covered by mask")
+	}
+
+	return &MsgFilter{ID: id, IDMask: mask, ExtFrame: extFrame, Invert: invert}, nil
+}
+
+// Range returns two values defining a range that corresponds
+// a single region defined by ID and IDMask fields. In this
+// case ok will be set to true. If ID and IDMask would create
+// multiple / many regions, ok is set to false.
+// Range may be useful for drivers that implement filtering
+// based on ID ranges.
+func (f *MsgFilter) Range() (from, to uint32, ok bool) {
+	topMask := uint32(1 << (11 - 1))
+	if f.ExtFrame {
+		topMask = 1 << (29 - 1)
+	}
+	mask := f.IDMask
+	upperMask := topMask | (topMask - 1)
+	topBit := mask & topMask
+	if !isTopDownMask(mask, upperMask, topBit) {
+		return 0, 0, false
+	}
+
+	inverted := ^f.IDMask & upperMask
+	return f.ID, f.ID | inverted, true
+}
+
+func isTopDownMask(mask, upperMask, topBit uint32) bool {
+	if mask == upperMask {
+		return true
+	}
+	if mask == 0 {
+		return true
+	}
+
+	// Flip bits: 11110000 -> 00001111
+	inverted := ^mask & upperMask
+
+	// Check if inverted is a block of 1s at the bottom (e.g., 00001111)
+	// A block of 1s at the bottom + 1 is always a power of 2 (e.g., 00010000)
+	return (inverted+1)&inverted == 0 && topBit != 0
 }

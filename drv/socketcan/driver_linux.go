@@ -158,6 +158,29 @@ func (drv *driver) Open(devName string, conf *can.Config) (can.Device, error) {
 		return nil, wrapErr("open", fmt.Errorf("cannot enter FD mode: %w", err))
 	}
 
+	if filters := conf.MsgFilter; len(filters) > 0 {
+		flt := make([]unix.CanFilter, len(filters))
+		for i := range filters {
+			f := &filters[i]
+
+			id := f.ID
+			if f.Invert {
+				id |= unix.CAN_INV_FILTER
+			}
+			if f.ExtFrame {
+				id |= unix.CAN_EFF_FLAG
+			}
+			flt[i] = unix.CanFilter{
+				Id:   id,
+				Mask: f.IDMask | unix.CAN_EFF_FLAG | unix.CAN_RTR_FLAG,
+			}
+		}
+		err := unix.SetsockoptCanRawFilter(fd, unix.SOL_CAN_RAW, unix.CAN_RAW_FILTER, flt)
+		if err != nil {
+			return nil, wrapErr("open", err)
+		}
+	}
+
 	errMask := linux.CAN_ERR_CRTL |
 		linux.CAN_ERR_BUSOFF |
 		linux.CAN_ERR_ACK |

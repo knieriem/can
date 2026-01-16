@@ -87,7 +87,7 @@ const (
 	DeviceId                         = 0x01
 	FiveVoltsPower         BoolPar   = 0x02
 	ReceiveEvent           HandlePar = 0x03
-	MsgFilter                        = 0x04
+	MsgFilter              IntPar    = 0x04
 	ApiVersion             StringPar = 0x05
 	ChanVersion            StringPar = 0x06
 	BusoffAutoreset        BoolPar   = 0x07

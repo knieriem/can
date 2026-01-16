@@ -190,6 +190,14 @@ func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error)
 		return
 	}
 
+	if len(conf.MsgFilter) != 0 {
+		err = h.FilterMsgs(conf.MsgFilter)
+		if err != nil {
+			h.Uninitialize()
+			return nil, err
+		}
+	}
+
 	d.h = h
 	d.name = can.Name{
 		ID:      b.name + strconv.Itoa(i+1),
