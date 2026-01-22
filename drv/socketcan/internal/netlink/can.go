@@ -12,6 +12,13 @@ import (
 	"github.com/mdlayher/netlink"
 )
 
+const (
+	ifla_CAN_TDC          = 0x10
+	ifla_CAN_CTRLMODE_EXT = 0x11
+
+	ifla_CAN_CTRLMODE_SUPPORTED = 1
+)
+
 // CanAttributes contain the attributes read from a CAN network interface.
 // Fields that are defined as pointers may be nil if they have not been included
 // by the kernel.
@@ -29,7 +36,8 @@ type CanAttributes struct {
 
 	// CtrlMode may be used to access unix.CAN_CTRLMODE_* flags,
 	// e.g. for activating FD mode or to configure termination.
-	CtrlMode unix.CANCtrlMode
+	CtrlMode          unix.CANCtrlMode
+	CtrlModeSupported uint32
 
 	RestartMs uint32
 	Clock     uint32
@@ -77,6 +85,12 @@ func decodeCanAttributes(data []byte) (*CanAttributes, error) {
 			if err != nil {
 				return nil, fmt.Errorf("parsing CtrlMode: %w", err)
 			}
+		case ifla_CAN_CTRLMODE_EXT:
+			flags, err := ad.decodeCtrlModeExt()
+			if err != nil {
+				return nil, fmt.Errorf("parsing CtrlModeExt: %w", err)
+			}
+			c.CtrlModeSupported = flags
 		case unix.IFLA_CAN_RESTART_MS:
 			c.RestartMs = ad.Uint32()
 
@@ -138,6 +152,21 @@ func (ad *canAttrDecoder) decodeStruct(v any) error {
 		return nil
 	})
 	return err
+}
+
+func (ad *canAttrDecoder) decodeCtrlModeExt() (uint32, error) {
+	var mask uint32
+	ad.Do(func(b []byte) error {
+		xad, _ := netlink.NewAttributeDecoder(b)
+		for xad.Next() {
+			if xad.Type() == ifla_CAN_CTRLMODE_SUPPORTED {
+				mask = xad.Uint32()
+				return nil
+			}
+		}
+		return nil
+	})
+	return mask, ad.Err()
 }
 
 func (can *canAttrEncoder) UpdateLink(link *Interface) error {
