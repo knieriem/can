@@ -215,11 +215,11 @@ func prepareBittiming(conf *can.Config, fdCapable bool) (tc uint16, btStr string
 		return defaultBitrate, "", nil
 	}
 
-	fd := conf.IsFDMode()
+	fd, err := conf.IsFDMode(fdCapable)
+	if err != nil {
+		return 0, "", err
+	}
 	if fd {
-		if !fdCapable {
-			return 0, "", errors.New("device is not FD capable")
-		}
 		var tmpBT can.BitTimingConfig
 		err := conf.Nominal.Resolve(&tmpBT, 80e6, &DevSpecFD.Nominal)
 		if err != nil {

@@ -32,6 +32,7 @@ type BitTimingConfig struct {
 
 type Optional[T any] struct {
 	Valid bool
+	Soft  bool
 	Value T
 }
 
@@ -44,11 +45,38 @@ func (bt *BitTimingConfig) isUnset() bool {
 	return bt.Bitrate == 0 && bt.BitTiming.PhaseSeg1 == 0
 }
 
+// clone creates a copy of the Config value;
+// not that the message filters slice is not duplicated currently.
+func (conf *Config) clone() *Config {
+	cp := *conf
+	return &cp
+}
+
 // IsFDMode returns true if either FDMode option is set or
 // a data bit timing, which implies fd mode, is specified.
-func (conf *Config) IsFDMode() bool {
-	return (conf.FDMode.Valid && conf.FDMode.Value) || conf.Data.Valid
+func (conf *Config) IsFDMode(fdCapable bool) (bool, error) {
+	if conf.FDMode.Valid && conf.FDMode.Value {
+		if !fdCapable {
+			if conf.FDMode.Soft {
+				return false, nil
+			}
+			return false, ErrFDNotSupported
+		}
+		return true, nil
+	}
+	if conf.Data.Valid {
+		if !fdCapable {
+			if conf.Data.Soft {
+				return false, nil
+			}
+			return false, ErrFDNotSupported
+		}
+		return true, nil
+	}
+	return false, nil
 }
+
+var ErrFDNotSupported = Error("FD mode not supported")
 
 // ParseConfSpecs parses CAN adapter configuration specifications.
 // The strings may contain space separated parameter settings.
@@ -152,6 +180,7 @@ func ParseConfig(specs ...string) (*Config, error) {
 	if c.Data.Valid {
 		if !c.FDMode.Valid {
 			c.FDMode.Set(true)
+			c.FDMode.Soft = c.Data.Soft
 		}
 	}
 	if c.Nominal.isUnset() {
@@ -168,17 +197,27 @@ func (c *Config) fromSpec(s string) error {
 		return c.Nominal.fromString(s)
 	}
 
+	soft := false
+	allowSoft := false
 	iColon := indexColon(s)
 	key, value := s, "1"
 	if iColon == -1 {
 		if iInt := strings.IndexAny(s, "!0123456789"); iInt != -1 {
 			key, value = s[:iInt], s[iInt:]
-		} else if !slices.Contains(boolKeys, s) {
-			return fmt.Errorf("key not found: %q", s)
+		} else {
+			key, soft = strings.CutSuffix(key, "?")
+
+			if !slices.Contains(boolKeys, key) {
+				return fmt.Errorf("key not found: %q", key)
+			}
 		}
 	} else {
 		key, value = s[:iColon], s[iColon+1:]
 	}
+	if !soft {
+		key, soft = strings.CutSuffix(key, "?")
+	}
+
 	switch key {
 	case "b":
 		err := c.Nominal.fromString(value)
@@ -191,11 +230,15 @@ func (c *Config) fromSpec(s string) error {
 			return err
 		}
 		c.Data.Valid = true
+		c.Data.Soft = soft
+		allowSoft = true
 	case "fd":
 		err := parseBoolInt(&c.FDMode, value)
 		if err != nil {
 			return err
 		}
+		c.FDMode.Soft = soft
+		allowSoft = true
 	case "f":
 		f, err := parseMsgFilter(value)
 		if err != nil {
@@ -207,6 +250,11 @@ func (c *Config) fromSpec(s string) error {
 		if err != nil {
 			return err
 		}
+		c.Termination.Soft = soft
+		allowSoft = true
+	}
+	if soft && !allowSoft {
+		return fmt.Errorf("key %q may not be used with '?'", key)
 	}
 	return nil
 }

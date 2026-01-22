@@ -109,6 +109,20 @@ func (drv *driver) Open(devName string, conf *can.Config) (can.Device, error) {
 
 	var cleanupPriv func()
 	if conf != nil {
+		info, err := link.Info()
+		if err != nil {
+			return nil, err
+		}
+		fdCapable := info.Can.CtrlModeSupported&unix.CAN_CTRLMODE_FD != 0
+		fd, err := conf.IsFDMode(fdCapable)
+		if err != nil {
+			return nil, err
+		}
+		if !fd {
+			conf.FDMode.Valid = false
+			conf.Data.Valid = false
+		}
+
 		priv := privilegedAccess(&privilegedDirect{Interface: link})
 		if drv.privilegedCmd != "" {
 			priv, err = startPrivilegedUtil(drv.privilegedCmd, link.Name)

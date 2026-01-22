@@ -95,7 +95,7 @@ type openProps struct {
 
 func WithConfig(conf *Config) Option {
 	return func(p *openProps) {
-		p.conf = conf
+		p.conf = conf.clone()
 	}
 }
 
