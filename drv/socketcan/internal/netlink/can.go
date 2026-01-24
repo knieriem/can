@@ -9,6 +9,7 @@ import (
 
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/knieriem/can"
+	"github.com/knieriem/can/timing"
 	"github.com/mdlayher/netlink"
 )
 
@@ -167,6 +168,34 @@ func (ad *canAttrDecoder) decodeCtrlModeExt() (uint32, error) {
 		return nil
 	})
 	return mask, ad.Err()
+}
+
+func (can *CanAttributes) Controller() *timing.Controller {
+	fdCapable := can.CtrlModeSupported&unix.CAN_CTRLMODE_FD != 0
+	if can.DataBitTimingConst == nil {
+		fdCapable = false
+	}
+	ctl := new(timing.Controller)
+	ctl.Clock = can.Clock
+	convertConstraints(&ctl.Nominal, can.BitTimingConst)
+	if fdCapable {
+		ctl.Data = new(timing.Constraints)
+		convertConstraints(ctl.Data, can.BitTimingConst)
+	}
+	return ctl
+}
+
+func convertConstraints(cstr *timing.Constraints, c *unix.CANBitTimingConst) {
+	cstr.TSeg1Min = int(c.Tseg1_min)
+	cstr.TSeg1Max = int(c.Tseg1_max)
+	cstr.TSeg2Min = int(c.Tseg2_min)
+	cstr.TSeg2Max = int(c.Tseg2_max)
+
+	cstr.SJWMax = int(c.Sjw_max)
+
+	cstr.PrescalerMin = int(c.Brp_min)
+	cstr.PrescalerMax = int(c.Brp_max)
+	cstr.PrescalerIncr = int(c.Brp_inc)
 }
 
 func (can *canAttrEncoder) UpdateLink(link *Interface) error {
