@@ -215,7 +215,7 @@ func prepareBittiming(conf *can.Config, fdCapable bool) (tc uint16, btStr string
 		return defaultBitrate, "", nil
 	}
 
-	fd, err := conf.IsFDMode(fdCapable)
+	fd, err := conf.ResolveFDMode(fdCapable)
 	if err != nil {
 		return 0, "", err
 	}

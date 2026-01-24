@@ -52,9 +52,14 @@ func (conf *Config) clone() *Config {
 	return &cp
 }
 
-// IsFDMode returns true if either FDMode option is set or
-// a data bit timing, which implies fd mode, is specified.
-func (conf *Config) IsFDMode(fdCapable bool) (bool, error) {
+// ResolveFDMode determines whether a Config requests FD mode,
+// factoring in the hardware's FD capability. It does not modify the Config.
+//
+// FD mode is requested if either the FDMode option is enabled or data bit timing
+// is specified. If the request is "soft" (FDMode.Soft or Data.Soft is true)
+// and fdCapable is false, the function returns isFD==false without an error.
+// If the request is strict and fdCapable is false, it returns ErrFDNotSupported.
+func (conf *Config) ResolveFDMode(fdCapable bool) (isFD bool, err error) {
 	if conf.FDMode.Valid && conf.FDMode.Value {
 		if !fdCapable {
 			if conf.FDMode.Soft {

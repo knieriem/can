@@ -114,7 +114,7 @@ func (drv *driver) Open(devName string, conf *can.Config) (can.Device, error) {
 			return nil, err
 		}
 		fdCapable := info.Can.CtrlModeSupported&unix.CAN_CTRLMODE_FD != 0
-		fd, err := conf.IsFDMode(fdCapable)
+		fd, err := conf.ResolveFDMode(ctl.Data != nil)
 		if err != nil {
 			return nil, err
 		}
