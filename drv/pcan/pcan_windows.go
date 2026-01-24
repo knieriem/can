@@ -220,20 +220,15 @@ func prepareBittiming(conf *can.Config, fdCapable bool) (tc uint16, btStr string
 		return 0, "", err
 	}
 	if fd {
-		var tmpBT can.BitTimingConfig
-		err := conf.Nominal.Resolve(&tmpBT, 80e6, &DevSpecFD.Nominal)
+		err := conf.ResolveBitTiming(&DevSpecFD)
 		if err != nil {
 			return 0, "", err
 		}
 		sb := new(strings.Builder)
 		sb.WriteString("f_clock=80000000")
-		formatBitTiming(sb, &tmpBT.BitTiming, "nom")
+		formatBitTiming(sb, &conf.Nominal.BitTiming, "nom")
 		if conf.Data.Valid {
-			err := conf.Data.Value.Resolve(&tmpBT, 80e6, DevSpecFD.Data)
-			if err != nil {
-				return 0, "", err
-			}
-			formatBitTiming(sb, &tmpBT.BitTiming, "data")
+			formatBitTiming(sb, &conf.Data.Value.BitTiming, "data")
 		}
 		return 0, sb.String(), nil
 	}

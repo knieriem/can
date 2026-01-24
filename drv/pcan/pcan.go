@@ -49,6 +49,7 @@ func (*driver) Name() string {
 }
 
 var DevSpecFD = timing.Controller{
+	Clock: 80e6,
 	Nominal: timing.Constraints{
 		TSeg1Max:     256,
 		TSeg2Max:     128,
