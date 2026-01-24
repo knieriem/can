@@ -536,6 +536,35 @@ func (enc *configEncoder) addOptBool(key string, opt Optional[bool]) {
 	enc.buf = append(enc.buf, s)
 }
 
+// ResolveBittiming calls Resolve on the nominal and, if requested and
+// supported, the data [BitTimingConfig] fields, updating the
+// Config in-place. The function returns any error received from any
+// of the Resolve calls.
+func (conf *Config) ResolveBitTiming(ctl *timing.Controller) error {
+	wantFD := (conf.FDMode.Valid && conf.FDMode.Value) || conf.Data.Valid
+	haveFD := ctl.Data != nil
+	if wantFD && !haveFD {
+		wantFD = false
+	}
+	if wantFD {
+		if !conf.Data.Valid {
+			conf.Data.Value = conf.Nominal
+			conf.Data.Valid = true
+		}
+	}
+	err := conf.Nominal.Resolve(nil, ctl.Clock, &ctl.Nominal)
+	if err != nil {
+		return err
+	}
+	if wantFD {
+		err := conf.Data.Value.Resolve(nil, ctl.Clock, ctl.Data)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Resolve interprets a BitTimingConfig.
 //
 // If a bitrate and (optionally) a sample point are specified,
