@@ -113,7 +113,7 @@ func (drv *driver) Open(devName string, conf *can.Config) (can.Device, error) {
 		if err != nil {
 			return nil, err
 		}
-		fdCapable := info.Can.CtrlModeSupported&unix.CAN_CTRLMODE_FD != 0
+		ctl := info.Can.Controller()
 		fd, err := conf.ResolveFDMode(ctl.Data != nil)
 		if err != nil {
 			return nil, err
@@ -122,29 +122,44 @@ func (drv *driver) Open(devName string, conf *can.Config) (can.Device, error) {
 			conf.FDMode.Valid = false
 			conf.Data.Valid = false
 		}
+		err = conf.ResolveBitTiming(ctl)
+		if err != nil {
+			return nil, err
+		}
 
-		priv := privilegedAccess(&privilegedDirect{Interface: link})
-		if drv.privilegedCmd != "" {
-			priv, err = startPrivilegedUtil(drv.privilegedCmd, link.Name)
+		// avoid bitrates being printed when formatting bit timings during config
+		conf.Nominal.Bitrate = 0
+		conf.Data.Value.Bitrate = 0
+
+		needUpdate, err := info.NeedUpdate(conf)
+		if err != nil {
+			return nil, err
+		}
+
+		if needUpdate {
+			priv := privilegedAccess(&privilegedDirect{Interface: link})
+			if drv.privilegedCmd != "" {
+				priv, err = startPrivilegedUtil(drv.privilegedCmd, link.Name)
+				if err != nil {
+					return nil, err
+				}
+				defer func() {
+					if cleanupPriv != nil {
+						cleanupPriv()
+					}
+				}()
+				cleanupPriv = func() {
+					priv.Close()
+				}
+			}
+			err = priv.SetConfig(conf)
 			if err != nil {
 				return nil, err
 			}
-			defer func() {
-				if cleanupPriv != nil {
-					cleanupPriv()
-				}
-			}()
-			cleanupPriv = func() {
-				priv.Close()
+			err = priv.UpDown(true)
+			if err != nil {
+				return nil, err
 			}
-		}
-		err = priv.SetConfig(conf)
-		if err != nil {
-			return nil, err
-		}
-		err = priv.UpDown(true)
-		if err != nil {
-			return nil, err
 		}
 	}
 

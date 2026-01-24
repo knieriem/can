@@ -198,6 +198,51 @@ func convertConstraints(cstr *timing.Constraints, c *unix.CANBitTimingConst) {
 	cstr.PrescalerIncr = int(c.Brp_inc)
 }
 
+func (can *CanAttributes) needUpdate(conf *can.Config) (needUpdate bool, err error) {
+	if !bittimingsEqual(&conf.Nominal, can.BitTiming) {
+		return true, nil
+	}
+	wantFD := conf.Data.Valid
+	haveFD := can.CtrlMode.Flags&unix.CAN_CTRLMODE_FD != 0
+	if haveFD != wantFD {
+		return true, nil
+	}
+	if wantFD {
+		if !bittimingsEqual(&conf.Data.Value, can.DataBitTiming) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func bittimingsEqual(btc *can.BitTimingConfig, bt *unix.CANBitTiming) bool {
+	if bt == nil {
+		// This may be the case when a USB adapter has just been plugged in,
+		// but not been configured yet.
+		return false
+	}
+	if btc.Tq != 0 {
+		switch {
+		case bt.Tq != uint32(btc.Tq):
+			return false
+		case bt.Prop_seg != uint32(btc.PropSeg):
+			return false
+		case bt.Phase_seg1 != uint32(btc.PhaseSeg1):
+			return false
+		case bt.Phase_seg2 != uint32(btc.PhaseSeg2):
+			return false
+		}
+	} else {
+		switch {
+		case bt.Bitrate != btc.Bitrate:
+			return false
+		case bt.Sample_point != uint32(btc.SamplePoint):
+			return false
+		}
+	}
+	return bt.Sjw == uint32(btc.SJW)
+}
+
 func (can *canAttrEncoder) UpdateLink(link *Interface) error {
 	data, err := can.ae.Encode()
 	if err != nil {

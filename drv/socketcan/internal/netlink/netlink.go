@@ -232,6 +232,17 @@ func (link *Link) DriverName() string {
 	return string(b)
 }
 
+func (link *Link) NeedUpdate(conf *can.Config) (needUpdate bool, err error) {
+	needUpdate, err = link.Can.needUpdate(conf)
+	if err != nil {
+		return false, err
+	}
+	if needUpdate {
+		return true, nil
+	}
+	return link.Attr.OperationalState != rtnetlink.OperStateUp, nil
+}
+
 func (link *Link) Bitrate() (uint32, bool) {
 	if link.Can == nil {
 		return 0, false
