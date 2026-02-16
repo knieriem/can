@@ -180,7 +180,7 @@ func (can *CanAttributes) Controller() *timing.Controller {
 	convertConstraints(&ctl.Nominal, can.BitTimingConst)
 	if fdCapable {
 		ctl.Data = new(timing.Constraints)
-		convertConstraints(ctl.Data, can.BitTimingConst)
+		convertConstraints(ctl.Data, can.DataBitTimingConst)
 	}
 	return ctl
 }
