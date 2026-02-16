@@ -27,7 +27,16 @@ type BitTiming struct {
 	PhaseSeg2 int
 
 	// SJW defines the resynchronization jump width, in time quanta.
-	SJW int
+	SJW    int
+	SJWExt SJWExt
+}
+
+// SJWExt allows an alternative specification of the sync jump width.
+type SJWExt struct {
+	// Ratio1000 allows to specify the sjw as a fraction of
+	// the whole bit, multiplied with 1000. This is the same
+	// resolution as used for the sample point internally.
+	Ratio1000 int
 }
 
 // Constraints defines device specific limits and properties.
@@ -135,6 +144,14 @@ func (t *BitTiming) SamplePoint() SamplePoint {
 // PhaseSeg2 and maxSJW.
 func (t *BitTiming) ConstrainSJW(maxSJW int) {
 	sjw := t.SJW
+	if sjw == 0 {
+		if r := t.SJWExt.Ratio1000; r != 0 {
+			nq := t.Nq()
+			sjw = (r*nq + 500) / 1000
+		} else {
+			sjw = t.PhaseSeg2
+		}
+	}
 	sjw = max(1, sjw)
 	if t.PhaseSeg1 != 0 && t.PhaseSeg2 != 0 {
 		sjw = min(sjw, t.PhaseSeg1, t.PhaseSeg2)

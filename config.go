@@ -30,6 +30,22 @@ type BitTimingConfig struct {
 	Tq time.Duration
 }
 
+func formatSJW(c *timing.BitTiming) string {
+	if c.SJW != 0 {
+		if c.SJW == c.PhaseSeg2 {
+			return ""
+		}
+	}
+	if c.SJWExt.Ratio1000 != 0 {
+		s := ":s." + fmt.Sprintf("%03d", c.SJWExt.Ratio1000)
+		return strings.TrimRight(s, "0")
+	}
+	if c.SJW != 0 {
+		return ":s" + strconv.Itoa(c.SJW)
+	}
+	return ""
+}
+
 type Optional[T any] struct {
 	Valid bool
 	Soft  bool
@@ -118,7 +134,7 @@ var ErrFDNotSupported = Error("FD mode not supported")
 //
 //		         seg-expr = prop-seg "-" ps1 "-" ps2
 //
-//		              sjw = "s" number
+//		              sjw = "s" [ number | "." fraction ]
 //
 //		     sample-point = "." fraction
 //
@@ -376,14 +392,26 @@ func (c *BitTimingConfig) fromString(s string) error {
 		c.Tq = time.Duration(tq) * time.Nanosecond
 	}
 
+	// parse sync jump width
 	if strings.HasPrefix(d.s, ":s") {
 		d.s = d.s[1:]
 	}
-	u, err := d.parsePrefixedInt('s', "sjw", true)
-	if err != nil {
-		return err
+	if strings.HasPrefix(d.s, "s.") {
+		d.s = d.s[1:]
+		rDiv1000, err := d.parsePrefixedInt('.', "sjw", false)
+		if err != nil {
+			return err
+		}
+		c.SJW = 0
+		c.SJWExt.Ratio1000 = rDiv1000
+	} else {
+		u, err := d.parsePrefixedInt('s', "sjw", true)
+		if err != nil {
+			return err
+		}
+		c.SJW = u
+		c.SJWExt = timing.SJWExt{}
 	}
-	c.SJW = u
 
 	return nil
 }
@@ -473,10 +501,7 @@ func (c *Config) Format(sep string) string {
 }
 
 func (c *BitTimingConfig) String() string {
-	sjw := ""
-	if c.SJW != 0 {
-		sjw += ":s" + strconv.Itoa(c.SJW)
-	}
+	sjw := formatSJW(&c.BitTiming)
 	if b := c.Bitrate; b != 0 {
 		sp := ""
 		if c.SamplePoint != 0 {
@@ -610,6 +635,7 @@ func (btc *BitTimingConfig) Resolve(dest *BitTimingConfig, clock uint32, cstr *t
 		return err
 	}
 	t.SJW = btc.SJW
+	t.SJWExt = btc.SJWExt
 	t.ConstrainSJW(cstr.SJWMax)
 	dest.BitTiming = *t
 	dest.Tq = t.CalcTq(clock)
