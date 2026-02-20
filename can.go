@@ -18,7 +18,7 @@ func (e Error) Error() string {
 type Driver interface {
 	Name() string
 	//	Version() string
-	Open(name string, conf *Config) (Device, error)
+	Open(env *Env, name string, conf *Config) (Device, error)
 	Scan() []Name
 }
 
@@ -105,9 +105,14 @@ func WithConfig(conf *Config) Option {
 //	name	Go driver name
 func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
 	var p openProps
+	var env Env
+
 	for _, o := range opts {
 		o(&p)
 	}
+
+	env.BufPool = newSimpleBufPool(16)
+
 	if p.conf == nil {
 		f := strings.Split(deviceSpec, ",")
 		if len(f) > 1 {
@@ -127,7 +132,7 @@ func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
 	drvName := f[0]
 	if drvName == "" {
 		for _, drv := range drvlist {
-			dev, err = drv.Open(name, p.conf)
+			dev, err = drv.Open(&env, name, p.conf)
 			if err == nil {
 				return
 			}
@@ -141,7 +146,7 @@ func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
 	}
 	for _, drv := range drvlist {
 		if drv.Name() == drvName {
-			return drv.Open(name, p.conf)
+			return drv.Open(&env, name, p.conf)
 		}
 	}
 	err = Error("driver not found: " + drvName)
@@ -155,6 +160,10 @@ func Scan() (list []Name) {
 	return
 }
 
+type Env struct {
+	BufPool DataBufPool
+}
+
 type Unversioned struct{}
 
 func (Unversioned) Name() Name       { return Name{} }
@@ -165,7 +174,7 @@ var UnsupportedDriver Driver = unsupported{}
 type unsupported struct{}
 
 func (unsupported) Name() string { return "unsupported" }
-func (unsupported) Open(name string, conf *Config) (Device, error) {
+func (unsupported) Open(_ *Env, name string, conf *Config) (Device, error) {
 	return nil, errors.New("not supported")
 }
 func (unsupported) Scan() []Name { return nil }

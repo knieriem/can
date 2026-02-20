@@ -58,6 +58,7 @@ type dev struct {
 		t0    can.Time
 		t0val int64
 	}
+	bufPool can.DataBufPool
 }
 
 func (d *dev) ID() string {
@@ -80,7 +81,7 @@ func (driver) Scan() []can.Name {
 	return list
 }
 
-func (drv *driver) Open(devName string, conf *can.Config) (can.Device, error) {
+func (drv *driver) Open(env *can.Env, devName string, conf *can.Config) (can.Device, error) {
 	if strings.HasPrefix(devName, "@") {
 		// devName is system device
 		dev := devName[1:]
@@ -229,6 +230,9 @@ func (drv *driver) Open(devName string, conf *can.Config) (can.Device, error) {
 	d.file = file
 	setupInfo(&d.name, info)
 	cleanupPriv = nil
+	if env != nil {
+		d.bufPool = env.BufPool
+	}
 	return d, nil
 }
 
@@ -283,7 +287,7 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 	if err != nil {
 		return 0, wrapErr("read", err)
 	}
-	err = f.decode(&buf[0])
+	err = f.decode(&buf[0], d.bufPool)
 	if err != nil {
 		return 0, err
 	}
