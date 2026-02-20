@@ -138,7 +138,7 @@ func (*driver) Scan() (list []can.Name) {
 	return
 }
 
-func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error) {
+func (*driver) Open(_ *can.Env, devName string, conf *can.Config) (cd can.Device, err error) {
 	defer wrapErr("open", &err)
 	d := new(dev)
 

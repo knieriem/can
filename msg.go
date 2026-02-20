@@ -57,8 +57,8 @@ type Msg struct {
 
 	// data contains the payload of the CAN message.
 	// It can be accessed through Data() and SetData()
-	data       []byte
-	stdPayload [8]byte
+	buf        DataBuffer
+	stdPayload stdPayload
 
 	Tx struct {
 		Delayµs int // The driver shall delay this message.
@@ -68,26 +68,169 @@ type Msg struct {
 	}
 }
 
+func (m *Msg) Release() {
+	if m.buf == nil {
+		return
+	}
+	m.buf.Put()
+	m.buf = nil
+}
+
+type stdPayload struct {
+	n    uint8
+	data [8]byte
+}
+
+func (p *stdPayload) Data() []byte {
+	return p.data[:p.n]
+}
+func (p *stdPayload) Set(b []byte) {
+	n := len(b)
+	if n == 0 {
+		p.Reset()
+		return
+	}
+	if &b[0] != &p.data[0] {
+		copy(p.data[:], b)
+		if n > cap(p.data) {
+			n = cap(p.data)
+		}
+	}
+	p.n = uint8(n)
+}
+
+func (p *stdPayload) Put()   {}
+func (p *stdPayload) Reset() { p.n = 0 }
+
+type DataBuffer interface {
+	// Data returns a byte slice with len set to the current data
+	// portion, and cap set to the size of the underlying buffer.
+	Data() []byte
+
+	// Set updates the length of the current data if the underlying
+	// buffer is the same. Otherwise it will use copy() to import
+	// the specified bytes.
+	Set([]byte)
+
+	// Put returns the buffer back to its internally referenced pool.
+	// Depending on whether a pool is associated, this may be a no-op.
+	Put()
+
+	// Reset sets the current slice to an empty slice.
+	Reset()
+}
+
 // Data returns the current Payload of the message.
 // If no payload buffer has been set by calling SetData before,
 // Data returns a byte slice with the standard payload length 8.
 func (m *Msg) Data() []byte {
-	if m.data == nil {
-		return m.stdPayload[:0]
+	if m.buf == nil {
+		return m.stdPayload.data[:m.stdPayload.n]
 	}
-	return m.data
+	return m.buf.Data()
 }
 
 // SetData updates the payload of the message.
 func (m *Msg) SetData(b []byte) {
-	m.data = b
+	n := len(b)
+	if n == 0 {
+		m.stdPayload.n = 0
+		if m.buf == nil {
+			return
+		}
+		m.buf.Reset()
+		return
+	}
+	p0 := &b[0]
+	if p0 == &m.stdPayload.data[0] {
+		m.stdPayload.Set(b)
+		return
+	}
+	if m.buf != nil {
+		m.buf.Put()
+	}
+	pd := PlainData(b)
+	m.buf = &pd
+}
+
+// Attach is similar to SetData, but instead of a byte slice,
+// a [DataBuffer] must be provided. This helps to avoid an internal
+// allocation in case the data contains more than eight bytes.
+func (m *Msg) Attach(b DataBuffer) {
+	if m.buf != nil {
+		m.buf.Put()
+	}
+	m.buf = b
+}
+
+// Import copies b into the message's backing store,
+// either the standard payload array (if ≤ 8 bytes),
+// or a user provided buffer previously set using SetData,
+// if available. Else it will try to get a sufficient buffer
+// from the pool, link it to the message, and copy the
+// contents of b there. If the pool argument is nil,
+// ErrMsgCapExceeded will be replied.
+func (m *Msg) Import(b []byte, pool DataBufPool) error {
+	n := len(b)
+	if m.buf != nil {
+		if n <= cap(m.buf.Data()) {
+			m.buf.Set(b)
+			return nil
+		}
+		m.buf.Put()
+		m.buf = nil
+	}
+	if n <= cap(m.stdPayload.data) {
+		m.stdPayload.Set(b)
+		m.buf = &m.stdPayload
+		return nil
+	}
+	if pool == nil {
+		return ErrMsgCapExceeded
+	}
+	buf := pool.Get(n)
+	buf.Set(b)
+	m.buf = buf
+	return nil
+}
+
+type PlainData []byte
+
+func (pd PlainData) Data() []byte {
+	return pd
+}
+
+func (pd *PlainData) Set(b []byte) {
+	n := len(b)
+	if n == 0 {
+		pd.Reset()
+		return
+	}
+	buf := *pd
+	if n > cap(buf) {
+		n = cap(buf)
+	}
+	buf = buf[:n]
+
+	if &b[0] != &buf[0] {
+		copy(buf, b)
+	}
+	*pd = buf
+}
+
+func (PlainData) Put() {}
+func (pd *PlainData) Reset() {
+	*pd = (*pd)[:0]
 }
 
 // Reset sets the message back to the initial state.
 func (m *Msg) Reset() {
 	m.Id = 0
 	m.Flags = 0
-	m.data = m.data[:0]
+	if m.buf == nil {
+		return
+	}
+	m.buf.Reset()
 }
 
 var ValidFDSizes = []int{12, 16, 20, 24, 36, 48, 64}
@@ -179,3 +322,66 @@ func (m *Msg) FromExpr(expr string) error {
 }
 
 var dots = strings.NewReplacer(".", "")
+
+type DataBufPool interface {
+	Get(minSize int) DataBuffer
+	Put(DataBuffer)
+}
+
+type simpleBufPool struct {
+	c chan *simpleDataBuf
+}
+
+func newSimpleBufPool(size int) *simpleBufPool {
+	p := &simpleBufPool{c: make(chan *simpleDataBuf, size)}
+	for range size / 2 {
+		p.c <- p.allocBuf()
+	}
+	return p
+}
+
+func (p *simpleBufPool) Get(n int) DataBuffer {
+	select {
+	case buf, ok := <-p.c:
+		if !ok {
+			panic("pool channel closed unexpectedly")
+		}
+
+		if cap(buf.PlainData) < n {
+			buf.PlainData = make([]byte, 0, n*3/2)
+		}
+		if buf.pool == nil {
+			buf.pool = p
+		}
+		return buf
+	default:
+	}
+	return p.allocBuf()
+}
+
+func (p *simpleBufPool) allocBuf() *simpleDataBuf {
+	buf := new(simpleDataBuf)
+	buf.PlainData = make([]byte, 0, 64)
+	buf.pool = p
+	return buf
+}
+
+func (p *simpleBufPool) Put(buf DataBuffer) {
+	sb, ok := buf.(*simpleDataBuf)
+	if !ok {
+		return
+	}
+	select {
+	case p.c <- sb:
+	default:
+	}
+}
+
+type simpleDataBuf struct {
+	PlainData
+	pool DataBufPool
+}
+
+func (sd *simpleDataBuf) Put() {
+	sd.pool.Put(sd)
+}

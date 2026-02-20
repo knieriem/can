@@ -48,7 +48,11 @@ func (f *frame) setFlags(v byte) {
 }
 
 func (f *frame) data() []byte {
-	return f.b[dataOffset:]
+	data := f.b[dataOffset:]
+	if n := f.len(); n < len(data) {
+		data = data[:n]
+	}
+	return data
 }
 
 func (f *frame) encode(msg *can.Msg, mtu int) (nw int, err error) {
@@ -87,7 +91,7 @@ func (f *frame) encode(msg *can.Msg, mtu int) (nw int, err error) {
 	return nw, nil
 }
 
-func (f *frame) decode(msg *can.Msg) error {
+func (f *frame) decode(msg *can.Msg, pool can.DataBufPool) error {
 	id := f.id()
 	msg.Reset()
 	if id&linux.CAN_ERR_FLAG != 0 {
@@ -124,15 +128,7 @@ func (f *frame) decode(msg *can.Msg) error {
 		msg.Flags = can.RTRMsg
 		return nil
 	}
-	data := msg.Data()
-	n := f.len()
-	if cap(data) < n {
-		return can.ErrMsgCapExceeded
-	}
-	data = data[:n]
-	msg.SetData(data)
-	copy(data, f.data())
-	return nil
+	return msg.Import(f.data(), pool)
 }
 
 func (f *frame) readFromN(r io.Reader, n int) error {
