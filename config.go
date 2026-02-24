@@ -117,7 +117,7 @@ var ErrFDNotSupported = Error("FD mode not supported")
 // which map to true and false. In case of true, the value may be omitted --
 // the key used alone stands for the value being "true".
 //
-// If a parameter is omitted altoget*her, the default settings of adapters
+// If a parameter is omitted altogether, the default settings of adapters
 // will be used, if not otherwise specified.
 //
 // Defined parameters:
