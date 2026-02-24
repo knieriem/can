@@ -60,9 +60,6 @@ type Msg struct {
 	buf        DataBuffer
 	stdPayload stdPayload
 
-	Tx struct {
-		Delayµs int // The driver shall delay this message.
-	}
 	Rx struct {
 		Time Time // Timestamp
 	}
