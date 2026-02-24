@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -50,9 +51,13 @@ func (driver) Name() string {
 }
 
 type dev struct {
-	file    io.ReadWriteCloser
-	mtu     int
-	name    can.Name
+	file io.ReadWriteCloser
+	mtu  int
+	name can.Name
+
+	sendBufMu sync.Mutex
+	sendBuf   frame
+
 	recvBuf frame
 	receive struct {
 		t0    can.Time
@@ -295,11 +300,15 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 }
 
 func (d *dev) WriteMsg(msg *can.Msg) error {
-	var f frame
 
 	if msg.IsStatus() {
 		return nil
 	}
+
+	d.sendBufMu.Lock()
+	defer d.sendBufMu.Unlock()
+	f := d.sendBuf
+
 	nf, err := f.encode(msg, d.mtu)
 	if err != nil {
 		return wrapErr("write", err)

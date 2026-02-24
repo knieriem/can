@@ -58,6 +58,7 @@ func (f *frame) data() []byte {
 func (f *frame) encode(msg *can.Msg, mtu int) (nw int, err error) {
 	nw = linux.CAN_MTU
 
+	clear(f.b[:])
 	data := msg.Data()
 	n := len(data)
 	if n > mtu-dataOffset {
