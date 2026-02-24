@@ -126,6 +126,15 @@ func config(intf *inet.Interface, _ string, args ...string) error {
 	if err != nil {
 		return err
 	}
+	info, err := intf.Info()
+	if err != nil {
+		return err
+	}
+	ctl := info.Can.Controller()
+	err = conf.ResolveBitTiming(ctl)
+	if err != nil {
+		return err
+	}
 	return intf.SetConfig(conf)
 }
 
