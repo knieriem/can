@@ -616,6 +616,7 @@ func (btc *BitTimingConfig) Resolve(dest *BitTimingConfig, clock uint32, cstr *t
 		} else {
 			dest.Prescaler = int(ps)
 		}
+		dest.ConstrainSJW(cstr.SJWMax)
 		return nil
 	}
 	if btc.PropSeg != 0 {
