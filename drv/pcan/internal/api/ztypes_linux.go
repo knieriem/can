@@ -57,7 +57,7 @@ type MsgFilter struct {
 }
 type Params struct {
 	NSubFunction int32
-	Func         [4]byte
+	Func         [64]byte
 }
 
 const (
@@ -69,7 +69,7 @@ const (
 	ioctlBTR0BTR1       = 0xc0087a85
 	ioctlGET_EXT_STATUS = 0x80107a86
 	ioctlMSG_FILTER     = 0x400c7a87
-	ioctlEXTRA_PARAMS   = 0xc0087a88
+	ioctlEXTRA_PARAMS   = 0xc0447a88
 
 	MsgStatus   = 0x80
 	MsgExtended = 0x2
