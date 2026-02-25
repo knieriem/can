@@ -6,7 +6,7 @@ toolchain go1.24.6
 
 require (
 	github.com/jsimonetti/rtnetlink v1.4.2
-	github.com/knieriem/can v0.3.0-alpha8
+	github.com/knieriem/can v0.3.0-beta1
 	github.com/mdlayher/netlink v1.7.2
 	golang.org/x/sys v0.35.0
 )
