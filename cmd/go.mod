@@ -3,8 +3,8 @@ module github.com/knieriem/can/cmd
 go 1.24.6
 
 require (
-	github.com/knieriem/can v0.3.0-alpha6
-	github.com/knieriem/can/drv/socketcan v0.1.0-alpha3
+	github.com/knieriem/can v0.3.0-beta1
+	github.com/knieriem/can/drv/socketcan v0.1.0-beta1
 	github.com/knieriem/tool v0.2.0
 )
 
@@ -20,7 +20,3 @@ require (
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
 )
-
-replace github.com/knieriem/can => ..
-
-replace github.com/knieriem/can/drv/socketcan => ../drv/socketcan

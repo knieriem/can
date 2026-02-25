@@ -6,6 +6,10 @@ github.com/josharian/native v1.1.0 h1:uuaP0hAbW7Y4l0ZRQ6C9zfb7Mg1mbFKry/xzDAfmtL
 github.com/josharian/native v1.1.0/go.mod h1:7X/raswPFr05uY3HiLlYeyQntB6OO7E/d2Cu7qoaN2w=
 github.com/jsimonetti/rtnetlink v1.4.2 h1:Df9w9TZ3npHTyDn0Ev9e1uzmN2odmXd0QX+J5GTEn90=
 github.com/jsimonetti/rtnetlink v1.4.2/go.mod h1:92s6LJdE+1iOrw+F2/RO7LYI2Qd8pPpFNNUYW06gcoM=
+github.com/knieriem/can v0.3.0-beta1 h1:Hw00ExJ/U9350kxB2JpWQ4//D7droq5WGhZoRYS1HLc=
+github.com/knieriem/can v0.3.0-beta1/go.mod h1:dov0C2L/qfKWOnMQgYRb2OlyOrzzVZTsx8+Wu4dWx54=
+github.com/knieriem/can/drv/socketcan v0.1.0-beta1 h1:0M7uXPVef8odK0L7IKucgtzMr/gsi05TLNlq8hZ59Zo=
+github.com/knieriem/can/drv/socketcan v0.1.0-beta1/go.mod h1:CxcgZQLzmzxET4DpWODb6RBDH2bGa9Xcv2ksabEHlRA=
 github.com/knieriem/g v0.1.2/go.mod h1:zYg1CmnYJBZ34OwOIRIqoBsvVxbGRjgE4kLQrHz7DBg=
 github.com/knieriem/g v0.5.0 h1:0WGfg4rfLD70T5e3SLZ9HtmmLQlRPChoKG15B3dfyqI=
 github.com/knieriem/g v0.5.0/go.mod h1:fhVCOebbqbZTIN+bv0aU/gOAasuZlP0ETeaF4N2553A=
