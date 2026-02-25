@@ -42,13 +42,14 @@ var tests = []test{
 			PropSeg:   2,
 			PhaseSeg1: 7,
 			PhaseSeg2: 6,
-			SJW:       1,
+			SJW:       4,
 		},
 		cmpTSeg1: true,
 	}, {
 		dev:     dev.MCP2515,
 		bitrate: 500e3,
 		sp:      875,
+		sjw:     1,
 		regs: &timing.RegValue{
 			Reg8: []uint8{0, 0xb5, 1},
 		},
@@ -71,7 +72,7 @@ var tests = []test{
 			PropSeg:   34,
 			PhaseSeg1: 35,
 			PhaseSeg2: 10,
-			SJW:       1,
+			SJW:       10,
 		},
 		tq: 25 * time.Nanosecond,
 	}, {
@@ -79,6 +80,7 @@ var tests = []test{
 		constr:  dev.MCP2518FD.Data,
 		bitrate: 1e6,
 		sp:      750,
+		sjw:     1,
 		opts: []timing.CalcOption{
 			timing.PreferLowerPrescaler(),
 		},
@@ -92,14 +94,17 @@ var tests = []test{
 	}, {
 		dev:     dev.LPC21xx,
 		bitrate: 250e3,
+		sjw:     1,
 		regs:    &timing.RegValue{Reg32: 0x1b0003},
 	}, {
 		dev:     dev.LPC21xx,
 		bitrate: 500e3,
+		sjw:     1,
 		regs:    &timing.RegValue{Reg32: 0x1b0001},
 	}, {
 		dev:     dev.LPC21xx,
 		bitrate: 1e6,
+		sjw:     1,
 		regs:    &timing.RegValue{Reg32: 0x1b0000},
 	},
 }
