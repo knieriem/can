@@ -36,7 +36,9 @@ Windows Support includes the arm64 architecture.
 
 ## SocketCAN
 
-The SocketCAN driver makes use of a utility `socketcan-link`, which is part of the repository and expected to be run with elevated privileges, specifically `CAP_NET_ADMIN` (to allow CAN interface configuration without root).
+The `socketcan` driver makes use of a utility `socketcan-link`,
+which is part of the repository and expected to be run with elevated privileges,
+specifically `CAP_NET_ADMIN` (to allow CAN interface configuration without root).
 See [drv/socketcan] for details.
 
 	cd drv/socketcan/cmd/socketcan-link
@@ -62,17 +64,29 @@ while "socketcan:can0" explicitely selects the `can0` network interface,
 and "socketcan:@spi0.1" would select the network interface linked to SPI device `0.1`.
 
 On default, a sample point of 87.5% is assumed.
-To specify a different sample point, use for instance: `,500k@.7` for 70%.
+To specify a different sample point, use for instance: `500k@.7` for 70%.
 A data bittiming for CAN FD mode can be specified using the `db:` prefix:
 
-	,500k@.8,db:1M@.7
+	500k@.8,db:1M@.7
 
-This will set the nominal bittiming to 500 kbit/s at 80%, and the data bittiming to 1 Mbit/s with a sample point set to 70%.
+This will set the nominal bittiming to 500 kbit/s at 80%,
+and the data bittiming to 1 Mbit/s with a sample point set to 70%.
 
 _Sync jump width_ is set to the size of the phase segment 2 on default,
-but can be set to a specific value (in tq or as fraction) if needed.
+but can be set to a specific value (in tq or as fraction) if needed,
+like 4 tq: `500k@.8s4` or `500k@.8:s4`, or 10 percent: `500k@.8:s.1`
+
+Instead of a bitrate a bit timing specification may be used, like:
+
+	*25:34-35-10
+
+which means 1 tq = 25ns, _propSeg_ = 34 tq, _phaseSeg1_ = 35 tq, _phaseSeg2_ = 10 tq.
+This will result in a bitrate of 500 kbit/s.
+The `*` character signals the multiplicative nature of the tq value;
+there is also `/` to specify a clock prescaler, like `/2`.
 
 FD mode is selected automatically if a data bitrate is specified and the adapter supports FD mode.
+It can be enforced by specifying `fd`, like in `,1M,fd`.
 
 
 [ParseConfig]: https://pkg.go.dev/github.com/knieriem/can@v0.3.0-alpha8#ParseConfig
@@ -125,7 +139,7 @@ similar but less complete compared to what [can-utils]' `cansend` provides.
 
 - PCAN-USB, PCAN-USB FD (`socketcan`, `pcan`; Linux, Windows)
 - MCP2518FD (`socketcan`; Linux on RPi)
-- candleLight FD (`socketcan`; Linux)
+- [candleLight FD] (USB/STM32G0B1, `socketcan`; Linux)
 
 ## Use Cases
 
@@ -138,3 +152,6 @@ In these cases, the PCAN-USB adapters are used on Windows and Linux.
 *Automotive*  
 The package is also used to communicate with LED drivers like ST's LLDL16EN on a CAN FD light bus.
 For this application, SocketCAN is used, with a MCP2518FD on linux/arm64.
+
+
+[candleLight FD]: https://linux-automation.com/en/products/candlelight-fd.html
