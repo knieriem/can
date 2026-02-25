@@ -102,10 +102,15 @@ func WithConfig(conf *Config) Option {
 	}
 }
 
+// Open tries to open a CAN device matching the device specification.
+// The deviceSpec has the syntax
 //
-//	driverName:deviceName:[,option][,option2]
+//	[ driverName [ ":" deviceName ] { "," ctlString } ]
 //
-//	name	Go driver name
+// The syntax suggests that "" is a valid input: It will try
+// to open any available CAN adapter with driver dependent default settings.
+// The comma separated ctl strings will be processed by [ParseConfig].
+// On success, a Device instance will be returned, else an error.
 func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
 	var p openProps
 	var env Env
