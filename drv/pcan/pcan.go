@@ -190,5 +190,5 @@ func (b *bus) nChan() int {
 }
 
 func (d *dev) ID() string {
-	return "pcan:" + d.name.ID
+	return "pcan:" + d.info.ID
 }

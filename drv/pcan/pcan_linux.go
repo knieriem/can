@@ -48,7 +48,7 @@ func (b *bus) sysName(minor int) string {
 	return "/dev/pcan" + b.name + strconv.Itoa(minor)
 }
 
-func (*driver) Scan() (list []can.Name) {
+func (*driver) Scan() (list []can.DeviceInfo) {
 
 	buses, err := parseProcfile()
 	if err != nil {
@@ -57,7 +57,7 @@ func (*driver) Scan() (list []can.Name) {
 
 	for _, b := range buses {
 		for i, ch := range b.channels {
-			list = append(list, can.Name{
+			list = append(list, can.DeviceInfo{
 				ID:     b.name + strconv.Itoa(i+1),
 				Driver: "pcan",
 				Device: b.sysName(ch.minor),
@@ -70,7 +70,7 @@ func (*driver) Scan() (list []can.Name) {
 type dev struct {
 	file    io.Closer
 	h       api.Fd
-	name    can.Name
+	info    can.DeviceInfo
 	receive struct {
 		epoll  *epoll.Pollster
 		status api.Status
@@ -105,11 +105,12 @@ func (*driver) Open(_ *can.Env, devName string, conf *can.Config) (cd can.Device
 	d := new(dev)
 	d.file = f
 	d.h = api.Fd(f.Fd())
-	d.name = can.Name{
+	d.info = can.DeviceInfo{
 		ID:     bus.name + strconv.Itoa(iDev+1),
 		Device: sysName,
 		Driver: "pcan",
 	}
+	d.setupInfo()
 
 	bitrate, err := timingConf(conf)
 	if err != nil {
@@ -239,16 +240,15 @@ func (d *dev) Close() (err error) {
 	return
 }
 
-func (d *dev) Version() (v can.Version) {
+func (d *dev) setupInfo() {
 	var diag api.Diag
 
 	err := d.h.Diag(&diag)
 	if err == nil {
-		v.Driver = diag.Version()
+		d.info.SystemDriver = diag.Version()
 	}
-	return
 }
 
-func (d *dev) Name() can.Name {
-	return d.name
+func (d *dev) Info() *can.DeviceInfo {
+	return &d.info
 }

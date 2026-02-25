@@ -64,7 +64,7 @@ func (*driver) Name() string {
 	return "rpc"
 }
 
-func (*driver) Scan() (list []can.Name) {
+func (*driver) Scan() (list []can.DeviceInfo) {
 	return
 }
 

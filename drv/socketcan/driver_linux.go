@@ -53,7 +53,7 @@ func (driver) Name() string {
 type dev struct {
 	file io.ReadWriteCloser
 	mtu  int
-	name can.Name
+	info can.DeviceInfo
 
 	sendBufMu sync.Mutex
 	sendBuf   frame
@@ -67,10 +67,10 @@ type dev struct {
 }
 
 func (d *dev) ID() string {
-	return "socketcan:" + d.name.ID
+	return "socketcan:" + d.info.ID
 }
 
-func (driver) Scan() []can.Name {
+func (driver) Scan() []can.DeviceInfo {
 	linkList, err := netlink.List()
 	if err != nil {
 		return nil
@@ -79,7 +79,7 @@ func (driver) Scan() []can.Name {
 		return nil
 	}
 
-	list := make([]can.Name, len(linkList))
+	list := make([]can.DeviceInfo, len(linkList))
 	for i, link := range linkList {
 		setupInfo(&list[i], link)
 	}
@@ -233,7 +233,7 @@ func (drv *driver) Open(env *can.Env, devName string, conf *can.Config) (can.Dev
 		return nil, wrapErr("open", err)
 	}
 	d.file = file
-	setupInfo(&d.name, info)
+	setupInfo(&d.info, info)
 	cleanupPriv = nil
 	if env != nil {
 		d.bufPool = env.BufPool
@@ -273,16 +273,12 @@ func pollableFile(fd int) (io.ReadWriteCloser, error) {
 	return os.NewFile(uintptr(fd), "socket"), nil
 }
 
-func setupInfo(info *can.Name, link *netlink.Link) {
-	dev := link.DriverName()
-	if dev != "" {
-		dev += ":"
-		dev += link.Attr.Name
-	}
-	*info = can.Name{
-		ID:     link.Attr.Name,
-		Device: dev,
-		Driver: "socketcan",
+func setupInfo(info *can.DeviceInfo, link *netlink.Link) {
+	*info = can.DeviceInfo{
+		ID:           link.Attr.Name,
+		Device:       link.Attr.Name,
+		Driver:       "socketcan",
+		SystemDriver: link.DriverName(),
 	}
 }
 
@@ -342,12 +338,8 @@ func (d *dev) Close() error {
 	return nil
 }
 
-func (d *dev) Version() can.Version {
-	return can.Version{}
-}
-
-func (d *dev) Name() can.Name {
-	return d.name
+func (d *dev) Info() *can.DeviceInfo {
+	return &d.info
 }
 
 func wrapErr(fnName string, err error) error {

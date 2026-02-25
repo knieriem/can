@@ -102,7 +102,7 @@ func (buses busList) reverseLookup(h api.Handle) (*bus, int) {
 }
 
 type dev struct {
-	name    can.Name
+	info    can.DeviceInfo
 	h       api.Handle
 	bus     *bus
 	receive struct {
@@ -117,7 +117,7 @@ type dev struct {
 	fdMode bool
 }
 
-func (*driver) Scan() (list []can.Name) {
+func (*driver) Scan() (list []can.DeviceInfo) {
 	d := api.AttachedDevices()
 	for i := range d {
 		ch := &d[i]
@@ -129,10 +129,10 @@ func (*driver) Scan() (list []can.Name) {
 			continue
 		}
 		disp := ch.DisplayName()
-		list = append(list, can.Name{
-			ID:      bus.name + strconv.Itoa(i+1),
-			Display: disp,
-			Driver:  "pcan",
+		list = append(list, can.DeviceInfo{
+			ID:     bus.name + strconv.Itoa(i+1),
+			Model:  disp,
+			Driver: "pcan",
 		})
 	}
 	return
@@ -199,11 +199,12 @@ func (*driver) Open(_ *can.Env, devName string, conf *can.Config) (cd can.Device
 	}
 
 	d.h = h
-	d.name = can.Name{
-		ID:      b.name + strconv.Itoa(i+1),
-		Driver:  "pcan",
-		Display: h.DisplayName(),
+	d.info = can.DeviceInfo{
+		ID:     b.name + strconv.Itoa(i+1),
+		Driver: "pcan",
+		Model:  h.DisplayName(),
 	}
+	d.setupInfo()
 	d.fdMode = btStr != ""
 
 	cd = d
@@ -250,8 +251,8 @@ func formatBitTiming(w io.Writer, t *timing.BitTiming, prefix string) {
 		prefix, t.SJW)
 }
 
-func (d *dev) Name() can.Name {
-	return d.name
+func (d *dev) Info() *can.DeviceInfo {
+	return &d.info
 }
 
 func (d *dev) Read(buf []can.Msg) (n int, err error) {
@@ -447,7 +448,7 @@ func (d *dev) Close() (err error) {
 	return
 }
 
-func (d *dev) Version() (v can.Version) {
+func (d *dev) setupInfo() {
 	apiVer, st := d.h.StringVal(api.ApiVersion)
 	if st == api.OK {
 		f := strings.FieldsFunc(apiVer, func(r rune) bool {
@@ -457,15 +458,14 @@ func (d *dev) Version() (v can.Version) {
 			}
 			return false
 		})
-		v.Api = strings.Join(f, ".")
+		d.info.APIVersion = strings.Join(f, ".")
 	}
 	chanVer, st := d.h.StringVal(api.ChanVersion)
 	if st == api.OK {
-		v.Driver = chanVer
+		d.info.SystemDriverVersion = chanVer
 	}
 	fwVer, st := d.h.StringVal(api.FirmwareVersion)
 	if st == api.OK {
-		v.Device = fwVer
+		d.info.Device = fwVer
 	}
-	return
 }

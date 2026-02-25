@@ -16,8 +16,8 @@ var cmdLsDev = &tool.Command{
 }
 
 func runLsDev(cmd *tool.Command, w io.Writer, args []string) error {
-	for _, name := range can.Scan() {
-		fmt.Print(name.Format("\t(", ", ", ")\n"))
+	for _, info := range can.Scan() {
+		fmt.Print(info.Format("\t(", ", ", ")\n"))
 	}
 	return nil
 }

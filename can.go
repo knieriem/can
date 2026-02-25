@@ -19,7 +19,7 @@ type Driver interface {
 	Name() string
 	//	Version() string
 	Open(env *Env, name string, conf *Config) (Device, error)
-	Scan() []Name
+	Scan() []DeviceInfo
 }
 
 var drvlist []Driver
@@ -48,43 +48,46 @@ type Device interface {
 	Write([]Msg) (n int, err error)
 
 	ID() string
-	Name() Name
-	Version() Version
+	Info() *DeviceInfo
 
 	Close() error
 }
 
-type Name struct {
-	ID      string
-	Display string
-	Device  string
-	Driver  string
+type DeviceInfo struct {
+	ID string
+
+	Model  string
+	Device string
+	Driver string
+
+	SystemDriver        string
+	SystemDriverVersion string
+
+	APIVersion string
+	Firmware   string
+	SerialNum  string
 }
 
-func (n *Name) String() string {
-	return n.Driver + ":" + n.ID
+func (di *DeviceInfo) String() string {
+	return di.Driver + ":" + di.ID
 }
 
-func (n *Name) Format(idSep, itemSep, end string) string {
+func (di *DeviceInfo) Format(idSep, itemSep, end string) string {
 	var item []string
-	if n.Display != "" {
-		item = append(item, n.Display)
+	if di.Model != "" {
+		item = append(item, di.Model)
 	}
-	if n.Device != "" {
-		item = append(item, n.Device)
+	if di.Device != "" && di.Device != di.ID {
+		item = append(item, di.Device)
+	}
+	if di.SystemDriver != "" {
+		item = append(item, di.SystemDriver)
 	}
 	s := ""
 	if idSep != "<OMIT ID>" {
-		s += n.String() + idSep
+		s += di.String() + idSep
 	}
 	return s + strings.Join(item, itemSep) + end
-}
-
-type Version struct {
-	Device    string
-	Driver    string
-	Api       string
-	SerialNum string
 }
 
 type Option func(*openProps)
@@ -153,7 +156,7 @@ func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
 	return
 }
 
-func Scan() (list []Name) {
+func Scan() (list []DeviceInfo) {
 	for _, drv := range drvlist {
 		list = append(list, drv.Scan()...)
 	}
@@ -166,8 +169,7 @@ type Env struct {
 
 type Unversioned struct{}
 
-func (Unversioned) Name() Name       { return Name{} }
-func (Unversioned) Version() Version { return Version{} }
+func (Unversioned) Info() *DeviceInfo { return &DeviceInfo{} }
 
 var UnsupportedDriver Driver = unsupported{}
 
@@ -177,7 +179,7 @@ func (unsupported) Name() string { return "unsupported" }
 func (unsupported) Open(_ *Env, name string, conf *Config) (Device, error) {
 	return nil, errors.New("not supported")
 }
-func (unsupported) Scan() []Name { return nil }
+func (unsupported) Scan() []DeviceInfo { return nil }
 
 // ErrTxQueueFull is returned when a Msg could not be added
 // to the devices' transmit queue. On Linux, it is returned
