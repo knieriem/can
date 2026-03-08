@@ -216,7 +216,7 @@ func (link *Link) Name() string {
 
 func (link *Link) DriverName() string {
 	if link.Can == nil {
-		if info := link.Attr.Info; info != nil && info.Kind == "vcan" {
+		if link.IsVCAN() {
 			return "vcan"
 		}
 		return ""
@@ -230,6 +230,11 @@ func (link *Link) DriverName() string {
 		b = b[:i]
 	}
 	return string(b)
+}
+
+func (link *Link) IsVCAN() bool {
+	info := link.Attr.Info
+	return info != nil && info.Kind == "vcan"
 }
 
 func (link *Link) NeedUpdate(conf *can.Config) (needUpdate bool, err error) {

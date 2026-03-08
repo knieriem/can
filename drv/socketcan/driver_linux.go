@@ -119,6 +119,12 @@ func (drv *driver) Open(env *can.Env, devName string, conf *can.Config) (can.Dev
 		if err != nil {
 			return nil, err
 		}
+		if info.Can == nil {
+			if info.IsVCAN() {
+				goto skipConfig
+			}
+			return nil, errors.New("netlink: unexpected nil CAN attributes")
+		}
 		ctl := info.Can.Controller()
 		fd, err := conf.ResolveFDMode(ctl.Data != nil)
 		if err != nil {
@@ -168,6 +174,7 @@ func (drv *driver) Open(env *can.Env, devName string, conf *can.Config) (can.Dev
 			}
 		}
 	}
+skipConfig:
 
 	if devName == "" {
 		devName = link.Name
