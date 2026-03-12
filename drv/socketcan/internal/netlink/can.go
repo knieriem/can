@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/jsimonetti/rtnetlink"
+	"github.com/jsimonetti/rtnetlink/v2"
 	"github.com/knieriem/can"
 	"github.com/knieriem/can/timing"
 	"github.com/mdlayher/netlink"
@@ -59,15 +59,39 @@ type CanAttributes struct {
 	UnknownTypes []uint16
 }
 
-func decodeCanAttributes(data []byte) (*CanAttributes, error) {
-	netlAd, err := netlink.NewAttributeDecoder(data)
-	if err != nil {
-		return nil, err
-	}
+type canAttrData struct {
+	tx *can.Config
+	rx *CanAttributes
+}
+
+func init() {
+	rtnetlink.RegisterDriver(&canAttrData{})
+}
+
+func (*canAttrData) Kind() string {
+	return "can"
+}
+
+func (*canAttrData) New() rtnetlink.LinkDriver {
+	return &canAttrData{}
+}
+
+func (d *canAttrData) Encode(ae *netlink.AttributeEncoder) error {
+	can := new(canAttrEncoder)
+	can.ae = ae
+	can.setConfig(d.tx)
+	return nil
+}
+
+func (d *canAttrData) Decode(netlAd *netlink.AttributeDecoder) error {
+	var err error
+
 	ad := new(canAttrDecoder)
 	ad.AttributeDecoder = netlAd
 
 	c := new(CanAttributes)
+	d.rx = c
+
 	for ad.Next() {
 		switch ad.Type() {
 		default:
@@ -76,7 +100,7 @@ func decodeCanAttributes(data []byte) (*CanAttributes, error) {
 			cnt := new(unix.CANBusErrorCounters)
 			err := ad.decodeStruct(cnt)
 			if err != nil {
-				return nil, fmt.Errorf("parsing CtrlMode: %w", err)
+				return fmt.Errorf("parsing CtrlMode: %w", err)
 			}
 			c.BusErrCounters = cnt
 		case unix.IFLA_CAN_STATE:
@@ -84,12 +108,12 @@ func decodeCanAttributes(data []byte) (*CanAttributes, error) {
 		case unix.IFLA_CAN_CTRLMODE:
 			err := ad.decodeStruct(&c.CtrlMode)
 			if err != nil {
-				return nil, fmt.Errorf("parsing CtrlMode: %w", err)
+				return fmt.Errorf("parsing CtrlMode: %w", err)
 			}
 		case ifla_CAN_CTRLMODE_EXT:
 			flags, err := ad.decodeCtrlModeExt()
 			if err != nil {
-				return nil, fmt.Errorf("parsing CtrlModeExt: %w", err)
+				return fmt.Errorf("parsing CtrlModeExt: %w", err)
 			}
 			c.CtrlModeSupported = flags
 		case unix.IFLA_CAN_RESTART_MS:
@@ -114,13 +138,13 @@ func decodeCanAttributes(data []byte) (*CanAttributes, error) {
 			c.BitrateMax = ad.Uint32()
 		}
 		if err := ad.Err(); err != nil {
-			return nil, err
+			return err
 		}
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return c, nil
+	return nil
 }
 
 type canAttrDecoder struct {
@@ -243,11 +267,7 @@ func bittimingsEqual(btc *can.BitTimingConfig, bt *unix.CANBitTiming) bool {
 	return bt.Sjw == uint32(btc.SJW)
 }
 
-func (can *canAttrEncoder) UpdateLink(link *Interface) error {
-	data, err := can.ae.Encode()
-	if err != nil {
-		return err
-	}
+func (link *Interface) SetConfig(conf *can.Config) error {
 	cur, err := link.get()
 	if err != nil {
 		return err
@@ -273,7 +293,7 @@ func (can *canAttrEncoder) UpdateLink(link *Interface) error {
 		Attributes: &rtnetlink.LinkAttributes{
 			Info: &rtnetlink.LinkInfo{
 				Kind: "can",
-				Data: data,
+				Data: &canAttrData{tx: conf},
 			},
 		},
 	}
@@ -284,13 +304,7 @@ type canAttrEncoder struct {
 	ae *netlink.AttributeEncoder
 }
 
-func NewCANAttrEncoder() *canAttrEncoder {
-	can := new(canAttrEncoder)
-	can.ae = netlink.NewAttributeEncoder()
-	return can
-}
-
-func (can *canAttrEncoder) SetConfig(conf *can.Config) {
+func (can *canAttrEncoder) setConfig(conf *can.Config) {
 	can.setBittiming(unix.IFLA_CAN_BITTIMING, &conf.Nominal)
 	fd := (conf.FDMode.Valid && conf.FDMode.Value) || conf.Data.Valid
 	if fd {

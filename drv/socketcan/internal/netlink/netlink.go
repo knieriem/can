@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/jsimonetti/rtnetlink"
+	"github.com/jsimonetti/rtnetlink/v2"
 	"github.com/knieriem/can"
 )
 
@@ -183,13 +183,6 @@ func (intf *Interface) UpDown(up bool) error {
 	})
 }
 
-func (intf *Interface) SetConfig(conf *can.Config) error {
-	enc := NewCANAttrEncoder()
-	enc.SetConfig(conf)
-	return enc.UpdateLink(intf)
-
-}
-
 type Link struct {
 	Attr *rtnetlink.LinkAttributes
 	Can  *CanAttributes
@@ -198,15 +191,12 @@ type Link struct {
 func newLinkInfo(a *rtnetlink.LinkAttributes) (*Link, error) {
 	link := new(Link)
 	link.Attr = a
-	if a.Info == nil || a.Info.Kind != "can" {
+	if a.Info == nil || a.Info.Data == nil {
 		return link, nil
 	}
-	ca := new(CanAttributes)
-	ca, err := decodeCanAttributes(a.Info.Data)
-	if err != nil {
-		return nil, err
+	if data, ok := a.Info.Data.(*canAttrData); ok {
+		link.Can = data.rx
 	}
-	link.Can = ca
 	return link, nil
 }
 
