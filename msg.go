@@ -322,7 +322,6 @@ var dots = strings.NewReplacer(".", "")
 
 type DataBufPool interface {
 	Get(minSize int) DataBuffer
-	Put(DataBuffer)
 }
 
 type simpleBufPool struct {
@@ -363,7 +362,7 @@ func (p *simpleBufPool) allocBuf() *simpleDataBuf {
 	return buf
 }
 
-func (p *simpleBufPool) Put(buf DataBuffer) {
+func (p *simpleBufPool) put(buf DataBuffer) {
 	sb, ok := buf.(*simpleDataBuf)
 	if !ok {
 		return
@@ -376,9 +375,9 @@ func (p *simpleBufPool) Put(buf DataBuffer) {
 
 type simpleDataBuf struct {
 	PlainData
-	pool DataBufPool
+	pool *simpleBufPool
 }
 
 func (sd *simpleDataBuf) Put() {
-	sd.pool.Put(sd)
+	sd.pool.put(sd)
 }
