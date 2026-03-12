@@ -158,6 +158,7 @@ func (m *Msg) Attach(b DataBuffer) {
 		m.buf.Put()
 	}
 	m.buf = b
+	m.stdPayload.n = 0
 }
 
 // Import copies b into the message's backing store,
