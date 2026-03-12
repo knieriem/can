@@ -129,22 +129,8 @@ func (m *Msg) Data() []byte {
 
 // SetData updates the payload of the message.
 func (m *Msg) SetData(b []byte) {
-	n := len(b)
-	if n == 0 {
-		m.stdPayload.n = 0
-		if m.buf == nil {
-			return
-		}
-		m.buf.Reset()
+	if m.Import(b, nil) == nil {
 		return
-	}
-	p0 := &b[0]
-	if p0 == &m.stdPayload.data[0] {
-		m.stdPayload.Set(b)
-		return
-	}
-	if m.buf != nil {
-		m.buf.Put()
 	}
 	pd := PlainData(b)
 	m.buf = &pd
