@@ -180,7 +180,6 @@ func (m *Msg) Import(b []byte, pool DataBufPool) error {
 	}
 	if n <= cap(m.stdPayload.data) {
 		m.stdPayload.Set(b)
-		m.buf = &m.stdPayload
 		return nil
 	}
 	if pool == nil {
