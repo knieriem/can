@@ -33,6 +33,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	defer c.Close()
 	conn = c
 
 	if prompt != "" {
