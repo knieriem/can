@@ -14,7 +14,7 @@ type test struct {
 	constr  *timing.Constraints
 	fOsc    uint32
 	bitrate uint32
-	sp      timing.SamplePoint
+	sp      timing.Frac1000
 	sjw     int
 	opts    []timing.CalcOption
 

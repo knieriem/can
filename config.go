@@ -24,7 +24,7 @@ type Config struct {
 type BitTimingConfig struct {
 	Bitrate     uint32
 	BitrateMult int
-	SamplePoint timing.SamplePoint
+	SamplePoint timing.Frac1000
 
 	timing.BitTiming
 
@@ -368,7 +368,7 @@ func (c *BitTimingConfig) fromString(s string) error {
 				if err != nil {
 					return err
 				}
-				c.SamplePoint = timing.SamplePoint(sp)
+				c.SamplePoint = timing.Frac1000(sp)
 			}
 		}
 	} else {
@@ -414,12 +414,12 @@ func (c *BitTimingConfig) fromString(s string) error {
 	}
 	if strings.HasPrefix(d.s, "s.") {
 		d.s = d.s[1:]
-		rDiv1000, err := d.parsePrefixedInt('.', "sjw", false)
+		r, err := d.parsePrefixedInt('.', "sjw", false)
 		if err != nil {
 			return err
 		}
 		c.SJW = 0
-		c.SJWExt.Ratio1000 = rDiv1000
+		c.SJWExt.Ratio1000 = timing.Frac1000(r)
 	} else if strings.HasPrefix(d.s, "s") {
 		u, err := d.parsePrefixedInt('s', "sjw", true)
 		if err != nil {

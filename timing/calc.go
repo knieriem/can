@@ -7,29 +7,6 @@ const (
 	syncSeg = 1 * tq
 )
 
-// SamplePoint defines the position within a bit, where the
-// signal is read by a CAN node. The unit is 0.1 %.
-// The zero value is replaced by 875 (87.5 %) during calculations.
-type SamplePoint int
-
-func calcSamplePoint(tseg1, nq int) SamplePoint {
-	return SamplePoint(((1+tseg1)*1000 + nq/2) / nq)
-}
-
-func (sp *SamplePoint) setupLazy(bitrate uint32) {
-	if *sp == 0 {
-		*sp = 875
-	}
-}
-
-func (sp SamplePoint) phSeg2(nq int) int {
-	return ((1000-int(sp))*nq + 500) / 1000
-}
-
-func (sp SamplePoint) Percent() float64 {
-	return float64(sp) / 10
-}
-
 type CalcOption func(*calcConf)
 
 type calcConf struct {
@@ -55,7 +32,7 @@ func ClockDiv(div int) CalcOption {
 // Zero values may be used for the sample point and
 // for the resynchronization jump width (sjw),
 // in which case sp=87.5 % and sjw=1 are substituted.
-func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, dev *Constraints, opts ...CalcOption) (t *BitTiming, err error) {
+func CalcBitTiming(fOsc, bitrate uint32, sp Frac1000, dev *Constraints, opts ...CalcOption) (t *BitTiming, err error) {
 	var conf calcConf
 
 	for _, o := range opts {
@@ -72,7 +49,9 @@ func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, dev *Constraints, opts 
 		nq0 /= uint32(conf.clockDiv)
 	}
 
-	sp.setupLazy(bitrate)
+	if sp == 0 {
+		sp = 875
+	}
 
 	for preSc := minVal(dev.PrescalerMin); preSc < dev.PrescalerMax; preSc += incr {
 		nq := int(nq0 / uint32(preSc))
@@ -85,7 +64,7 @@ func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, dev *Constraints, opts 
 		if nq > nqMax {
 			continue
 		}
-		ps2 := dev.constrainPhSeg2(sp.phSeg2(nq))
+		ps2 := dev.constrainPhSeg2(sp.applyCompl(nq))
 	again:
 		// compute a tseg1
 		tseg1 := nq - ps2 - syncSeg
@@ -101,7 +80,7 @@ func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, dev *Constraints, opts 
 			break
 		}
 
-		errLoc := abs(int(calcSamplePoint(tseg1, nq) - sp))
+		errLoc := abs(int(calcFrac(1+tseg1, nq) - sp))
 		if errLoc >= minErrLoc {
 			continue
 		}

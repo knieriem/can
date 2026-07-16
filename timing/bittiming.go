@@ -36,7 +36,7 @@ type SJWExt struct {
 	// Ratio1000 allows to specify the sjw as a fraction of
 	// the whole bit, multiplied with 1000. This is the same
 	// resolution as used for the sample point internally.
-	Ratio1000 int
+	Ratio1000 Frac1000
 }
 
 // Constraints defines device specific limits and properties.
@@ -135,8 +135,8 @@ func (t *BitTiming) Bitrate(fOsc uint32) uint32 {
 }
 
 // SamplePoint returns the sample point defined by the BitTiming values.
-func (t *BitTiming) SamplePoint() SamplePoint {
-	return calcSamplePoint(t.TSeg1(), t.Nq())
+func (t *BitTiming) SamplePoint() Frac1000 {
+	return calcFrac(t.TSeg1(), t.Nq())
 }
 
 // ConstrainSJW ensures that SJW is between bounds 1 and - in case these
@@ -147,7 +147,7 @@ func (t *BitTiming) ConstrainSJW(maxSJW int) {
 	if sjw == 0 {
 		if r := t.SJWExt.Ratio1000; r != 0 {
 			nq := t.Nq()
-			sjw = (r*nq + 500) / 1000
+			sjw = r.apply(nq)
 		} else {
 			sjw = t.PhaseSeg2
 		}

@@ -19,7 +19,7 @@ func newSoftBool(value bool) Optional[bool] {
 }
 
 // Helper function to create a BitTimingConfig for tests.
-func newBitTimingConfig(bitrate uint32, bitrateMult int, sp timing.SamplePoint, tq time.Duration, prescaler, prop, ps1, ps2, sjw int) BitTimingConfig {
+func newBitTimingConfig(bitrate uint32, bitrateMult int, sp timing.Frac1000, tq time.Duration, prescaler, prop, ps1, ps2, sjw int) BitTimingConfig {
 	return BitTimingConfig{
 		Bitrate:     bitrate,
 		BitrateMult: bitrateMult,
