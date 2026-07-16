@@ -139,7 +139,7 @@ var ErrFDNotSupported = Error("FD mode not supported")
 //
 //		     sample-point = "." fraction
 //
-//		Examples: 500k@.875, b1M@.75 refering to 500 kbit/s or 1 Mbit/s,
+//		Examples: 500k@.875, b1M@.75 referring to 500 kbit/s or 1 Mbit/s,
 //		with sample points at 87.5% resp. 75%.
 //		In case of nominal bitrates, as an exception, the "b" key may be
 //		omitted. So, stating "500k" will be recognized as b:500k.

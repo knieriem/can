@@ -40,7 +40,7 @@ func (f Flags) IsStatus() bool {
 	return f&StatusMsg != 0
 }
 
-// Reports whether the message contains an 29 bit wide, extended indentifier,
+// Reports whether the message contains an 29 bit wide, extended identifier,
 // or a standard 11 bit wide identifier.
 func (f Flags) ExtFrame() bool {
 	return f&ExtFrame != 0
