@@ -13,10 +13,16 @@ func newOptionalBool(value bool) Optional[bool] {
 	return Optional[bool]{Valid: true, Value: value}
 }
 
+// Helper function to create an Optional[bool] with a value, and soft set to true.
+func newSoftBool(value bool) Optional[bool] {
+	return Optional[bool]{Valid: true, Value: value, Soft: true}
+}
+
 // Helper function to create a BitTimingConfig for tests.
-func newBitTimingConfig(bitrate uint32, sp timing.SamplePoint, tq time.Duration, prescaler, prop, ps1, ps2, sjw int) BitTimingConfig {
+func newBitTimingConfig(bitrate uint32, bitrateMult int, sp timing.SamplePoint, tq time.Duration, prescaler, prop, ps1, ps2, sjw int) BitTimingConfig {
 	return BitTimingConfig{
 		Bitrate:     bitrate,
+		BitrateMult: bitrateMult,
 		SamplePoint: sp,
 		BitTiming: timing.BitTiming{
 			Prescaler: prescaler,
@@ -60,7 +66,8 @@ func deepEqualConfig(a, b *Config) bool {
 		return false
 	}
 	if a.FDMode.Valid != b.FDMode.Valid ||
-		(a.FDMode.Valid && a.FDMode.Value != b.FDMode.Value) {
+		(a.FDMode.Valid && a.FDMode.Value != b.FDMode.Value) ||
+		(a.FDMode.Valid && a.FDMode.Soft != b.FDMode.Soft) {
 		return false
 	}
 
@@ -80,7 +87,7 @@ func TestParseConfig(t *testing.T) {
 			name:  "nominal 500k",
 			input: "500k",
 			want: &Config{
-				Nominal: newBitTimingConfig(500000, 0, 0, 0, 0, 0, 0, 0),
+				Nominal: newBitTimingConfig(500000, 0, 0, 0, 0, 0, 0, 0, 0),
 			},
 			wantFmt: "500k",
 		},
@@ -88,7 +95,7 @@ func TestParseConfig(t *testing.T) {
 			name:  "nominal 1M with sample point",
 			input: "1M@.875",
 			want: &Config{
-				Nominal: newBitTimingConfig(1000000, 875, 0, 0, 0, 0, 0, 0),
+				Nominal: newBitTimingConfig(1000000, 0, 875, 0, 0, 0, 0, 0, 0),
 			},
 			wantFmt: "1M@.875",
 		},
@@ -96,7 +103,7 @@ func TestParseConfig(t *testing.T) {
 			name:  "nominal 250k with SJW",
 			input: "b:250k:s4",
 			want: &Config{
-				Nominal: newBitTimingConfig(250000, 0, 0, 0, 0, 0, 0, 4),
+				Nominal: newBitTimingConfig(250000, 0, 0, 0, 0, 0, 0, 0, 4),
 			},
 			wantFmt: "250k:s4",
 		},
@@ -104,7 +111,7 @@ func TestParseConfig(t *testing.T) {
 			name:  "nominal with full bit timing",
 			input: "b:/20:8-7-6",
 			want: &Config{
-				Nominal: newBitTimingConfig(0, 0, 0, 20, 8, 7, 6, 0),
+				Nominal: newBitTimingConfig(0, 0, 0, 0, 20, 8, 7, 6, 0),
 			},
 			wantFmt: "/20:8-7-6",
 		},
@@ -112,11 +119,21 @@ func TestParseConfig(t *testing.T) {
 			name:  "data 2M with sample point and SJW",
 			input: "db:2M@.75:s4 b:500k",
 			want: &Config{
-				Nominal: newBitTimingConfig(500000, 0, 0, 0, 0, 0, 0, 0),
-				Data:    Optional[BitTimingConfig]{Valid: true, Value: newBitTimingConfig(2000000, 750, 0, 0, 0, 0, 0, 4)},
+				Nominal: newBitTimingConfig(500000, 0, 0, 0, 0, 0, 0, 0, 0),
+				Data:    Optional[BitTimingConfig]{Valid: true, Value: newBitTimingConfig(2000000, 0, 750, 0, 0, 0, 0, 0, 4)},
 				FDMode:  newOptionalBool(true),
 			},
 			wantFmt: "500k db:2M@.75:s4",
+		},
+		{
+			name:  "multiple partial bitrate definitions",
+			input: "1000k b:@.8:s4 500k db?:x2 db?:@.7",
+			want: &Config{
+				Nominal: newBitTimingConfig(500000, 0, 800, 0, 0, 0, 0, 0, 4),
+				Data:    Optional[BitTimingConfig]{Valid: true, Soft: true, Value: newBitTimingConfig(0, 2, 700, 0, 0, 0, 0, 0, 0)},
+				FDMode:  newSoftBool(true),
+			},
+			wantFmt: "500k@.8:s4 db:x2@.7",
 		},
 		{
 			name:    "data bitrate without nominal bitrate should fail",
@@ -128,7 +145,7 @@ func TestParseConfig(t *testing.T) {
 			name:  "simple fd",
 			input: "2000k fd",
 			want: &Config{
-				Nominal: newBitTimingConfig(2e6, 0, 0, 0, 0, 0, 0, 0),
+				Nominal: newBitTimingConfig(2e6, 0, 0, 0, 0, 0, 0, 0, 0),
 				FDMode:  newOptionalBool(true),
 			},
 			wantFmt: "2M fd",
@@ -137,7 +154,7 @@ func TestParseConfig(t *testing.T) {
 			name:  "fd disabled",
 			input: "250k fd:0",
 			want: &Config{
-				Nominal: newBitTimingConfig(250e3, 0, 0, 0, 0, 0, 0, 0),
+				Nominal: newBitTimingConfig(250e3, 0, 0, 0, 0, 0, 0, 0, 0),
 				FDMode:  newOptionalBool(false),
 			},
 			wantFmt: "250k fd:0",
@@ -146,7 +163,7 @@ func TestParseConfig(t *testing.T) {
 			name:  "termination enabled",
 			input: "500k T",
 			want: &Config{
-				Nominal:     newBitTimingConfig(500e3, 0, 0, 0, 0, 0, 0, 0),
+				Nominal:     newBitTimingConfig(500e3, 0, 0, 0, 0, 0, 0, 0, 0),
 				Termination: newOptionalBool(true),
 			},
 			wantFmt: "500k T",
@@ -155,7 +172,7 @@ func TestParseConfig(t *testing.T) {
 			name:  "termination disabled",
 			input: "250k T0",
 			want: &Config{
-				Nominal:     newBitTimingConfig(250e3, 0, 0, 0, 0, 0, 0, 0),
+				Nominal:     newBitTimingConfig(250e3, 0, 0, 0, 0, 0, 0, 0, 0),
 				Termination: newOptionalBool(false),
 			},
 			wantFmt: "250k T0",
@@ -164,8 +181,8 @@ func TestParseConfig(t *testing.T) {
 			name:  "complex config string",
 			input: "b500k fd T db2M@.75:s4",
 			want: &Config{
-				Nominal:     newBitTimingConfig(500e3, 0, 0, 0, 0, 0, 0, 0),
-				Data:        Optional[BitTimingConfig]{Valid: true, Value: newBitTimingConfig(2e6, 750, 0, 0, 0, 0, 0, 4)},
+				Nominal:     newBitTimingConfig(500e3, 0, 0, 0, 0, 0, 0, 0, 0),
+				Data:        Optional[BitTimingConfig]{Valid: true, Value: newBitTimingConfig(2e6, 0, 750, 0, 0, 0, 0, 0, 4)},
 				Termination: newOptionalBool(true),
 				FDMode:      newOptionalBool(true),
 			},

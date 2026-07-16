@@ -141,7 +141,9 @@ func (drv *driver) Open(env *can.Env, devName string, conf *can.Config) (can.Dev
 
 		// avoid bitrates being printed when formatting bit timings during config
 		conf.Nominal.Bitrate = 0
+		conf.Nominal.BitrateMult = 0
 		conf.Data.Value.Bitrate = 0
+		conf.Data.Value.BitrateMult = 0
 
 		needUpdate, err := info.NeedUpdate(conf)
 		if err != nil {

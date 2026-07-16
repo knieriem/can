@@ -23,6 +23,7 @@ type Config struct {
 
 type BitTimingConfig struct {
 	Bitrate     uint32
+	BitrateMult int
 	SamplePoint timing.SamplePoint
 
 	timing.BitTiming
@@ -327,25 +328,40 @@ func (c *BitTimingConfig) fromString(s string) error {
 	}
 	tqSpec, ok := tqSpecs[b]
 	if !ok {
-		v, err := d.parsePrefixedInt(0, "bitrate", false)
-		if err != nil {
-			return err
-		}
-		bitrate := uint32(v)
-		s := d.s
-		if len(s) != 0 {
-			switch s[0] {
-			case 'M':
-				bitrate *= 1e6
-				d.s = s[1:]
-			case 'k':
-				bitrate *= 1000
-				d.s = s[1:]
+		switch b {
+		case 'x':
+			v, err := d.parsePrefixedInt('x', "bitrateMult", false)
+			if err != nil {
+				return err
 			}
-			s = d.s
+			if v > 16 {
+				return fmt.Errorf("parsing %q: invalid bitrate multiplier", s)
+			}
+			c.Bitrate = 0
+			c.BitrateMult = v
+		case '@':
+			/* this bitrate spec defines a sample point only */
+		default:
+			v, err := d.parsePrefixedInt(0, "bitrate", false)
+			if err != nil {
+				return err
+			}
+			bitrate := uint32(v)
+			s := d.s
+			if len(s) != 0 {
+				switch s[0] {
+				case 'M':
+					bitrate *= 1e6
+					d.s = s[1:]
+				case 'k':
+					bitrate *= 1000
+					d.s = s[1:]
+				}
+			}
+			c.Bitrate = bitrate
+			c.BitrateMult = 0
 		}
-		c.Bitrate = bitrate
-		if len(s) > 0 {
+		if s := d.s; len(s) > 0 {
 			if s[0] == '@' {
 				d.s = s[1:]
 				sp, err := d.parsePrefixedInt('.', "samplePoint", false)
@@ -404,7 +420,7 @@ func (c *BitTimingConfig) fromString(s string) error {
 		}
 		c.SJW = 0
 		c.SJWExt.Ratio1000 = rDiv1000
-	} else {
+	} else if strings.HasPrefix(d.s, "s") {
 		u, err := d.parsePrefixedInt('s', "sjw", true)
 		if err != nil {
 			return err
@@ -502,13 +518,16 @@ func (c *Config) Format(sep string) string {
 
 func (c *BitTimingConfig) String() string {
 	sjw := formatSJW(&c.BitTiming)
+	sp := ""
+	if c.SamplePoint != 0 {
+		sp = "@." + fmt.Sprintf("%03d", c.SamplePoint)
+		sp = strings.TrimRight(sp, "0")
+	}
 	if b := c.Bitrate; b != 0 {
-		sp := ""
-		if c.SamplePoint != 0 {
-			sp = "@." + fmt.Sprintf("%03d", c.SamplePoint)
-			sp = strings.TrimRight(sp, "0")
-		}
 		return FormatBitrate(b) + sp + sjw
+	}
+	if mult := c.BitrateMult; mult != 0 {
+		return "x" + strconv.Itoa(mult) + sp + sjw
 	}
 
 	x := ""
@@ -582,7 +601,11 @@ func (conf *Config) ResolveBitTiming(ctl *timing.Controller) error {
 		return err
 	}
 	if wantFD {
-		err := conf.Data.Value.Resolve(nil, ctl.Clock, ctl.Data)
+		v := &conf.Data.Value
+		if mult := v.BitrateMult; mult != 0 {
+			v.Bitrate = conf.Nominal.BitTiming.Bitrate(ctl.Clock) * uint32(mult)
+		}
+		err := v.Resolve(nil, ctl.Clock, ctl.Data)
 		if err != nil {
 			return err
 		}
