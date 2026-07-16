@@ -119,6 +119,9 @@ func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, dev *Constraints, opts 
 			PhaseSeg1: ps1,
 			PhaseSeg2: ps2,
 		}
+		if errLoc == 0 {
+			break
+		}
 	}
 
 	if bestTiming.PhaseSeg2 == 0 {
