@@ -38,12 +38,6 @@ type calcConf struct {
 	clockDiv             int
 }
 
-func PreferLowerPrescaler() CalcOption {
-	return func(conf *calcConf) {
-		conf.preferLowerPrescaler = true
-	}
-}
-
 func AlignPhSeg1PhSeg2() CalcOption {
 	return func(conf *calcConf) {
 		conf.alignPhSeg1PhSeg2 = true
@@ -108,13 +102,8 @@ func CalcBitTiming(fOsc, bitrate uint32, sp SamplePoint, dev *Constraints, opts 
 		}
 
 		errLoc := abs(int(calcSamplePoint(tseg1, nq) - sp))
-		if errLoc > minErrLoc {
+		if errLoc >= minErrLoc {
 			continue
-		}
-		if conf.preferLowerPrescaler {
-			if errLoc == minErrLoc {
-				continue
-			}
 		}
 		minErrLoc = errLoc
 

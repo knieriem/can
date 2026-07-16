@@ -34,9 +34,6 @@ var tests = []test{
 		fOsc:    20e6,
 		bitrate: 125e3,
 		sp:      625,
-		opts: []timing.CalcOption{
-			timing.PreferLowerPrescaler(),
-		},
 		bt: &timing.BitTiming{
 			Prescaler: 5,
 			PropSeg:   2,
@@ -64,9 +61,6 @@ var tests = []test{
 	}, {
 		dev:     dev.MCP2518FD,
 		bitrate: 500e3,
-		opts: []timing.CalcOption{
-			timing.PreferLowerPrescaler(),
-		},
 		bt: &timing.BitTiming{
 			Prescaler: 1,
 			PropSeg:   34,
@@ -81,9 +75,6 @@ var tests = []test{
 		bitrate: 1e6,
 		sp:      750,
 		sjw:     1,
-		opts: []timing.CalcOption{
-			timing.PreferLowerPrescaler(),
-		},
 		bt: &timing.BitTiming{
 			Prescaler: 1,
 			PropSeg:   14,

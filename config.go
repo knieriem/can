@@ -654,7 +654,7 @@ func (btc *BitTimingConfig) Resolve(dest *BitTimingConfig, clock uint32, cstr *t
 	if btc.Bitrate == 0 {
 		return errors.New("bitrate not found")
 	}
-	t, err := timing.CalcBitTiming(clock, btc.Bitrate, btc.SamplePoint, cstr, timing.PreferLowerPrescaler())
+	t, err := timing.CalcBitTiming(clock, btc.Bitrate, btc.SamplePoint, cstr)
 	if err != nil {
 		return err
 	}
