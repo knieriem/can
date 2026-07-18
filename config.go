@@ -678,18 +678,18 @@ func parseMsgFilter(v string) (*MsgFilter, error) {
 	extFrame := false
 
 	v, invert := strings.CutPrefix(v, "!")
-	i := strings.IndexByte(v, ':')
-	if i != -1 {
+	before, after, ok := strings.Cut(v, ":")
+	if ok {
 		n := len(v) - strings.Count(v, "_")
 		if n > 6+1 {
 			extFrame = true
 		}
-		u, err := strconv.ParseUint("0x"+v[:i], 0, 32)
+		u, err := strconv.ParseUint("0x"+before, 0, 32)
 		if err != nil {
 			return nil, err
 		}
 		id = uint32(u)
-		u, err = strconv.ParseUint("0x"+v[i+1:], 0, 32)
+		u, err = strconv.ParseUint("0x"+after, 0, 32)
 		if err != nil {
 			return nil, err
 		}

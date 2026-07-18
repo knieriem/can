@@ -160,10 +160,7 @@ func (dev *Constraints) constrainPhSeg2(ps2 int) int {
 }
 
 func oscTol(sjw, prop, ps1, ps2 int) int {
-	minPh := ps1
-	if ps2 < ps1 {
-		minPh = ps2
-	}
+	minPh := min(ps2, ps1)
 	nq := 1 + prop + ps1 + ps2
 	cond1 := 1e6 * minPh / 2 / (13*nq - ps2)
 	cond2 := 1e6 * sjw / (20 * nq)
