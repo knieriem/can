@@ -28,11 +28,11 @@ func ClockDiv(div int) CalcOption {
 }
 
 // CalcBitTiming calculates a bit timing with the desired location of the
-// sample point for the given oscillator frequency and bitrate.
+// sample point for the given CAN clock frequency and bitrate.
 // Zero values may be used for the sample point and
 // for the resynchronization jump width (sjw),
 // in which case sp=87.5 % and sjw=1 are substituted.
-func CalcBitTiming(fOsc, bitrate uint32, sp Frac1000, dev *Constraints, opts ...CalcOption) (t *BitTiming, err error) {
+func CalcBitTiming(fCAN, bitrate uint32, sp Frac1000, dev *Constraints, opts ...CalcOption) (t *BitTiming, err error) {
 	var conf calcConf
 
 	for _, o := range opts {
@@ -44,7 +44,7 @@ func CalcBitTiming(fOsc, bitrate uint32, sp Frac1000, dev *Constraints, opts ...
 
 	incr := minVal(dev.PrescalerIncr)
 
-	nq0 := fOsc / bitrate
+	nq0 := fCAN / bitrate
 	if conf.clockDiv != 0 {
 		nq0 /= uint32(conf.clockDiv)
 	}

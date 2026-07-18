@@ -7,7 +7,7 @@ import (
 
 // Bittiming defines the CAN bit timing values.
 // The length of a time quantum, as mentioned below,
-// is the oscillator period multiplied with the prescaler value
+// is the CAN clock period multiplied with the prescaler value
 // (and, depending on the device, the value of an extra,
 // device-internal divider).
 type BitTiming struct {
@@ -115,11 +115,11 @@ func (t *BitTiming) TSeg2() int {
 }
 
 // The value of a time quantum. Note that if a device applies, in addition to the
-// prescaler, an extra divider to fOsc, the argument to Tq must be divided by
+// prescaler, an extra divider to fCAN, the argument to Tq must be divided by
 // that value. For instance, a MCP2515 contains an internal division by two,
-// so in case of a 16 MHz oscillator the argument fOsc should be 8 MHz.
-func (t *BitTiming) CalcTq(fOsc uint32) time.Duration {
-	return time.Second * time.Duration(t.Prescaler) / time.Duration(fOsc)
+// so in case of a 16 MHz oscillator the argument fCAN should be 8 MHz.
+func (t *BitTiming) CalcTq(fCAN uint32) time.Duration {
+	return time.Second * time.Duration(t.Prescaler) / time.Duration(fCAN)
 }
 
 // Number of time quanta.
@@ -127,11 +127,11 @@ func (t *BitTiming) Nq() int {
 	return 1 + t.TSeg1() + t.TSeg2()
 }
 
-// Bitrate calculates the resulting CAN bitrate for the given fOsc.
-// See the comment for the .Tq method for how to reduce fOsc in case
+// Bitrate calculates the resulting CAN bitrate for the given fCAN.
+// See the comment for the .Tq method for how to reduce fCAN in case
 // of an extra device internal divider.
-func (t *BitTiming) Bitrate(fOsc uint32) uint32 {
-	return fOsc / uint32(t.Prescaler) / uint32(t.Nq())
+func (t *BitTiming) Bitrate(fCAN uint32) uint32 {
+	return fCAN / uint32(t.Prescaler) / uint32(t.Nq())
 }
 
 // SamplePoint returns the sample point defined by the BitTiming values.
