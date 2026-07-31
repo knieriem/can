@@ -216,7 +216,7 @@ func (m *Msg) Reset() {
 	m.buf.Reset()
 }
 
-var ValidFDSizes = []int{12, 16, 20, 24, 36, 48, 64}
+var ValidFDSizes = []int{12, 16, 20, 24, 32, 48, 64}
 
 func VerifyDataLenFD(n int) (next int, needsFD bool, err error) {
 	if n <= 8 {
