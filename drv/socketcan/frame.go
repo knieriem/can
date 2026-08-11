@@ -126,6 +126,12 @@ func (f *frame) decode(msg *can.Msg, pool can.DataBufPool) error {
 		idMask = linux.CAN_EFF_MASK
 	}
 	msg.Id = id & idMask
+	if id&linux.CANFD_BRS != 0 {
+		msg.Flags = can.FDSwitchBitrate
+	}
+	if f.len() <= 8 && id&linux.CANFD_FDF != 0 {
+		msg.Flags = can.ForceFD
+	}
 	if id&linux.CAN_RTR_FLAG != 0 {
 		msg.Flags = can.RTRMsg
 		return nil
