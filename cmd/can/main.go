@@ -16,7 +16,7 @@ func init() {
 
 func main() {
 	tool.Name = "can"
-	tool.Title = "Can"
+	tool.Title = "CAN utility."
 	tool.Version = "0.1"
 	tool.Commands = []*tool.Command{
 		tool.CmdVersion,
