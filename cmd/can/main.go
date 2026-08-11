@@ -25,6 +25,7 @@ func main() {
 		cmdTrace,
 		cmdBittiming,
 		cmdServe,
+		cmdExpose,
 	}
 	tool.Run()
 }
