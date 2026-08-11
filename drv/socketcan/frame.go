@@ -83,11 +83,12 @@ func (f *frame) encode(msg *can.Msg, mtu int) (nw int, err error) {
 	}
 	f.setid(id)
 
-	if needsFD || msg.Test(can.ForceFD) {
-		nw = len(f.b)
-	}
 	if msg.Flags.Test(can.FDSwitchBitrate) {
 		f.setFlags(linux.CANFD_BRS)
+		needsFD = true
+	}
+	if needsFD || msg.Test(can.ForceFD) {
+		nw = len(f.b)
 	}
 	return nw, nil
 }
