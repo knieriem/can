@@ -34,6 +34,7 @@ var devSpecMap = map[string]*timing.Controller{
 	"sja1000":   dev.SJA1000,
 
 	"candlelightfd": dev.CandleLightFD,
+	"mcan":          dev.MCAN,
 }
 
 var clockFlag float64
