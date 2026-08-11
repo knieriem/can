@@ -13,6 +13,7 @@ const (
 
 	CANFD_BRS = 0x1
 	CANFD_ESI = 0x2
+	CANFD_FDF = 0x4
 
 	CAN_MTU   = 0x10
 	CANFD_MTU = 0x48

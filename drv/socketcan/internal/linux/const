@@ -10,6 +10,7 @@ CAN_ERR_MASK
 // CAN FD flags
 CANFD_BRS
 CANFD_ESI
+CANFD_FDF
 
 // sizes of CanFrame and CanfdFrame structs
 CAN_MTU
