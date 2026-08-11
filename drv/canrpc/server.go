@@ -52,7 +52,12 @@ func (w *WireMsg) encode(m *can.Msg) {
 
 func (w *WireMsg) decode(m *can.Msg) {
 	m.Id = w.ID
-	m.SetData(w.Data)
+	if len(w.Data) <= 8 {
+		m.SetData(w.Data)
+	} else {
+		data := can.PlainData(w.Data)
+		m.Attach(&data)
+	}
 	m.Flags = w.Flags
 }
 
