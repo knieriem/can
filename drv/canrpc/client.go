@@ -92,21 +92,29 @@ func (d *device) ID() string {
 }
 
 func (d *device) Read(buf []can.Msg) (n int, err error) {
-	var r []can.Msg
+	var r []WireMsg
 	d.cl.Lock()
 	err = d.call("Read", len(buf), &r)
 	d.cl.Unlock()
 	if err == nil {
-		copy(buf, r)
+		for i := range r {
+			r[i].decode(&buf[i])
+		}
 		n = len(r)
 	}
 	return
 }
 
 func (d *device) Write(buf []can.Msg) (n int, err error) {
-	err = d.call("Write", buf, &n)
-	return
+	for i := range buf {
+		err := d.WriteMsg(&buf[i])
+		if err != nil {
+			return i, err
+		}
+	}
+	return len(buf), nil
 }
+
 func (d *device) WriteMsg(m *can.Msg) (err error) {
 	var w WireMsg
 	w.encode(m)
