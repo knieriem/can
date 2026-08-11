@@ -7,6 +7,7 @@ package can
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -305,6 +306,34 @@ func (m *Msg) FromExpr(expr string) error {
 }
 
 var dots = strings.NewReplacer(".", "")
+
+func (m *Msg) Format() string {
+	var sb strings.Builder
+
+	idFormat := "%03X:"
+	if m.ExtFrame() {
+		idFormat = "%08X:"
+	}
+	if m.Flags == RTRMsg {
+		sb.WriteByte('R')
+		return sb.String()
+	}
+	fmt.Fprintf(&sb, idFormat, m.Id)
+	fdFlags := 0
+	if m.Flags&FDSwitchBitrate != 0 {
+		fdFlags = 1
+	}
+	data := m.Data()
+	if m.Flags&ForceFD != 0 && len(data) <= 8 {
+		fdFlags |= 4
+	}
+	if fdFlags != 0 || len(data) > 8 {
+		fmt.Fprintf(&sb, ":%X", fdFlags)
+	}
+	x := strings.ToUpper(hex.EncodeToString(data))
+	sb.WriteString(x)
+	return sb.String()
+}
 
 type DataBufPool interface {
 	Get(minSize int) DataBuffer
