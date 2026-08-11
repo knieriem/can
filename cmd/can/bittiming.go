@@ -21,7 +21,7 @@ var cmdBittiming = &tool.Command{
 }
 
 func init() {
-	cmdBittiming.Flag.Float64Var(&clockFlag, "clock", 0, "oscillator frequency (MHz)")
+	cmdBittiming.Flag.Float64Var(&clockFlag, "clock", 0, "can clock frequency (MHz)")
 	cmdBittiming.Flag.StringVar(&devSpec, "dev", "sja1000", "device")
 
 	cmdBittiming.Run = runBittiming
