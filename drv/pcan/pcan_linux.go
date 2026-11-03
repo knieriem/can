@@ -191,7 +191,6 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 var msgFlagsMap = drv.FlagsMap{
 	{can.RTRMsg, api.MsgRtr},
 	{can.ExtFrame, api.MsgExtended},
-	{can.FDSwitchBitrate, api.MsgStatus},
 }
 
 func (d *dev) decode(dst *can.Msg, m *api.Msg, µs int64) (st api.Status) {
