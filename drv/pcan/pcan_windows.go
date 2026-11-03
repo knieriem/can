@@ -187,6 +187,7 @@ func (*driver) Open(_ *can.Env, devName string, conf *can.Config) (cd can.Device
 
 	if err = h.SetValue(api.ReceiveEvent, d.receive.ev).Err(); err != nil {
 		h.Uninitialize()
+		windows.CloseHandle(d.receive.ev)
 		return
 	}
 
@@ -194,6 +195,7 @@ func (*driver) Open(_ *can.Env, devName string, conf *can.Config) (cd can.Device
 		err = h.FilterMsgs(conf.MsgFilter)
 		if err != nil {
 			h.Uninitialize()
+			windows.CloseHandle(d.receive.ev)
 			return nil, err
 		}
 	}
