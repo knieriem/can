@@ -43,6 +43,10 @@ func (f *frame) setLen(n int) {
 	f.b[lenOffset] = byte(n)
 }
 
+func (f *frame) flags() byte {
+	return f.b[flagsOffset]
+}
+
 func (f *frame) setFlags(v byte) {
 	f.b[flagsOffset] = byte(v)
 }
@@ -93,7 +97,7 @@ func (f *frame) encode(msg *can.Msg, mtu int) (nw int, err error) {
 	return nw, nil
 }
 
-func (f *frame) decode(msg *can.Msg, pool can.DataBufPool) error {
+func (f *frame) decode(msg *can.Msg, nRead int, pool can.DataBufPool) error {
 	id := f.id()
 	msg.Reset()
 	if id&linux.CAN_ERR_FLAG != 0 {
@@ -122,34 +126,35 @@ func (f *frame) decode(msg *can.Msg, pool can.DataBufPool) error {
 	idMask := uint32(linux.CAN_SFF_MASK)
 	if id&linux.CAN_EFF_FLAG != 0 {
 		/* extended frame */
-		msg.Flags = can.ExtFrame
+		msg.Flags |= can.ExtFrame
 		idMask = linux.CAN_EFF_MASK
 	}
 	msg.Id = id & idMask
-	if id&linux.CANFD_BRS != 0 {
-		msg.Flags = can.FDSwitchBitrate
-	}
-	if f.len() <= 8 && id&linux.CANFD_FDF != 0 {
-		msg.Flags = can.ForceFD
-	}
-	if id&linux.CAN_RTR_FLAG != 0 {
-		msg.Flags = can.RTRMsg
+	flags := f.flags()
+
+	if isFD := nRead == linux.CANFD_MTU || flags&linux.CANFD_FDF != 0; isFD {
+		if flags&linux.CANFD_BRS != 0 {
+			msg.Flags |= can.FDSwitchBitrate
+		}
+		if f.len() <= 8 {
+			msg.Flags |= can.ForceFD
+		}
+	} else if id&linux.CAN_RTR_FLAG != 0 {
+		msg.Flags |= can.RTRMsg
 		return nil
 	}
 	return msg.Import(f.data(), pool)
 }
 
-func (f *frame) readFromN(r io.Reader, n int) error {
+func (f *frame) readFromN(r io.Reader, n int) (int, error) {
 	n, err := r.Read(f.b[:n])
 	if err != nil {
-		return err
+		return 0, err
 	}
-
-	// check for frame integrity
 	if n < dataOffset || dataOffset+f.len() > n {
-		return fmt.Errorf("unexpected short read: %d bytes", n)
+		return 0, fmt.Errorf("unexpected short read: %d bytes", n)
 	}
-	return nil
+	return n, nil
 }
 
 var ErrMTUExceeded = errors.New("frame length exceeds MTU")
