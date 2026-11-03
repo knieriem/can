@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/jsimonetti/rtnetlink/v2 v2.2.0
-	github.com/knieriem/can v0.3.0-beta1
+	github.com/knieriem/can v0.4.0
 	github.com/mdlayher/netlink v1.9.0
 	golang.org/x/sys v0.42.0
 )
