@@ -191,7 +191,7 @@ func (*driver) Open(_ *can.Env, devName string, conf *can.Config) (cd can.Device
 		return
 	}
 
-	if len(conf.MsgFilter) != 0 {
+	if conf != nil && len(conf.MsgFilter) != 0 {
 		err = h.FilterMsgs(conf.MsgFilter)
 		if err != nil {
 			h.Uninitialize()
