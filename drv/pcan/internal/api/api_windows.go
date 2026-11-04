@@ -79,7 +79,7 @@ func (m *MsgFD) Data() []byte {
 	if n > 8 {
 		i := n - 9
 		if i >= len(can.ValidFDSizes) {
-			i = len(can.ValidFDSizes)
+			i = len(can.ValidFDSizes) - 1
 		}
 		n = can.ValidFDSizes[i]
 	}
