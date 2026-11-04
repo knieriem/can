@@ -299,9 +299,9 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 		case st.Test(api.ErrBUSHEAVY | api.ErrBUSOFF):
 			st &= api.ErrBUSHEAVY | api.ErrBUSOFF
 			if st != prevSt {
-				buf[n] = can.Msg{
-					Flags: errFlagsMap.Decode(int(st)) | can.StatusMsg,
-				}
+				m := &buf[n]
+				m.Reset() // keeps the payload storage
+				m.Flags = errFlagsMap.Decode(int(st)) | can.StatusMsg
 				n++
 				prevSt = st
 				return
