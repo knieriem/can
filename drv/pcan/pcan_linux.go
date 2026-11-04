@@ -131,7 +131,7 @@ func (*driver) Open(_ *can.Env, devName string, conf *can.Config) (cd can.Device
 	if d.receive.epoll, err = epoll.NewPollster(); err != nil {
 		return
 	}
-	if d.receive.epoll.AddFD(int(d.h), 'r', true); err != nil {
+	if _, err = d.receive.epoll.AddFD(int(d.h), 'r', true); err != nil {
 		return
 	}
 	d.h.SetMsgFilter(nil)
