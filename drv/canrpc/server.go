@@ -5,6 +5,7 @@
 package canrpc
 
 import (
+	"bytes"
 	"io"
 
 	"github.com/knieriem/can"
@@ -46,7 +47,9 @@ type WireMsg struct {
 
 func (w *WireMsg) encode(m *can.Msg) {
 	w.ID = m.Id
-	w.Data = m.Data()
+	// Copy: m's storage is reused by the next Read,
+	// while net/rpc may still be encoding w.
+	w.Data = bytes.Clone(m.Data())
 	w.Flags = m.Flags
 }
 
