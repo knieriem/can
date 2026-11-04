@@ -62,9 +62,12 @@ func (bt *BitTimingConfig) isUnset() bool {
 	return bt.Bitrate == 0 && bt.BitTiming.PhaseSeg1 == 0
 }
 
-// clone creates a copy of the Config value;
-// not that the message filters slice is not duplicated currently.
+// clone returns a copy of conf, or nil if conf is nil.
+// The message filter slice is shared.
 func (conf *Config) clone() *Config {
+	if conf == nil {
+		return nil
+	}
 	cp := *conf
 	return &cp
 }

@@ -140,7 +140,8 @@ func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
 	drvName := f[0]
 	if drvName == "" {
 		for _, drv := range drvlist {
-			dev, err = drv.Open(&env, name, p.conf)
+			// Drivers may modify the config; give each its own copy.
+			dev, err = drv.Open(&env, name, p.conf.clone())
 			if err == nil {
 				return
 			}
