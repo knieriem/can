@@ -114,9 +114,7 @@ func main() {
 
 	// Write a standard frame containing one byte, 0x42, with identifier 0xABC.
 	m.Id = 0xABC
-	data := m.Data()[:1]
-	data[0] = 0x42
-	m.SetData(data)
+	m.SetData([]byte{0x42})
 	err = dev.WriteMsg(&m)
 	if err != nil {
 		// ...

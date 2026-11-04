@@ -5,6 +5,7 @@
 package can
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -51,170 +52,73 @@ func (f Flags) Test(t Flags) bool {
 	return (f & t) == t
 }
 
-// Definition of a CAN Message.
+// A Msg is a CAN frame, or a status message (see [Flags.IsStatus]).
+//
+// Payloads of up to eight bytes are stored in the Msg itself,
+// so copying such a Msg copies its payload. Storage for longer
+// payloads is allocated on demand, reused by later SetData and Read
+// calls, and shared by copies; use [Msg.Clone] for an independent copy.
 type Msg struct {
 	Id uint32 // The CAN message identifier
 	Flags
 
-	// data contains the payload of the CAN message.
-	// It can be accessed through Data() and SetData()
-	buf        DataBuffer
-	stdPayload stdPayload
+	n      uint8   // payload length, if stored inline
+	inline [8]byte // classic payload
+	ext    []byte  // payload longer than eight bytes; storage reused
 
 	Rx struct {
 		Time Time // Timestamp
 	}
 }
 
-func (m *Msg) Release() {
-	if m.buf == nil {
-		return
-	}
-	m.buf.Put()
-	m.buf = nil
-}
-
-type stdPayload struct {
-	n    uint8
-	data [8]byte
-}
-
-func (p *stdPayload) Data() []byte {
-	return p.data[:p.n]
-}
-func (p *stdPayload) Set(b []byte) {
-	n := len(b)
-	if n == 0 {
-		p.Reset()
-		return
-	}
-	if &b[0] != &p.data[0] {
-		copy(p.data[:], b)
-		if n > cap(p.data) {
-			n = cap(p.data)
-		}
-	}
-	p.n = uint8(n)
-}
-
-func (p *stdPayload) Put()   {}
-func (p *stdPayload) Reset() { p.n = 0 }
-
-type DataBuffer interface {
-	// Data returns a byte slice with len set to the current data
-	// portion, and cap set to the size of the underlying buffer.
-	Data() []byte
-
-	// Set updates the length of the current data if the underlying
-	// buffer is the same. Otherwise it will use copy() to import
-	// the specified bytes.
-	Set([]byte)
-
-	// Put returns the buffer back to its internally referenced pool.
-	// Depending on whether a pool is associated, this may be a no-op.
-	Put()
-
-	// Reset sets the current slice to an empty slice.
-	Reset()
-}
-
-// Data returns the current Payload of the message.
-// If no payload buffer has been set by calling SetData before,
-// Data returns a byte slice with the standard payload length 8.
+// Data returns the payload. The slice is valid until the next
+// SetData, Reset, or Read into m.
+//
+// A payload of up to eight bytes is stored in m itself, and the
+// returned slice has capacity eight. It may be resliced, filled,
+// and passed to SetData, which then only records the new length.
 func (m *Msg) Data() []byte {
-	if m.buf == nil {
-		return m.stdPayload.data[:m.stdPayload.n]
+	if len(m.ext) > 0 {
+		return m.ext
 	}
-	return m.buf.Data()
+	return m.inline[:m.n]
 }
 
-// SetData updates the payload of the message.
+// SetData sets m's payload to the contents of b. It does not retain b.
+// If b is m's own payload storage, as returned by Data and resliced,
+// only the length is updated.
 func (m *Msg) SetData(b []byte) {
-	if m.Import(b, nil) == nil {
-		return
-	}
-	pd := PlainData(b)
-	m.buf = &pd
-}
-
-// Attach is similar to SetData, but instead of a byte slice,
-// a [DataBuffer] must be provided. This helps to avoid an internal
-// allocation in case the data contains more than eight bytes.
-func (m *Msg) Attach(b DataBuffer) {
-	if m.buf != nil {
-		m.buf.Put()
-	}
-	m.buf = b
-	m.stdPayload.n = 0
-}
-
-// Import copies b into the message's backing store,
-// either the standard payload array (if ≤ 8 bytes),
-// or a user provided buffer previously set using SetData,
-// if available. Else it will try to get a sufficient buffer
-// from the pool, link it to the message, and copy the
-// contents of b there. If the pool argument is nil,
-// ErrMsgCapExceeded will be replied.
-func (m *Msg) Import(b []byte, pool DataBufPool) error {
-	n := len(b)
-	if m.buf != nil {
-		if n <= cap(m.buf.Data()) {
-			m.buf.Set(b)
-			return nil
+	if len(b) <= len(m.inline) {
+		if len(b) > 0 && &b[0] != &m.inline[0] {
+			copy(m.inline[:], b)
 		}
-		m.buf.Put()
-		m.buf = nil
-	}
-	if n <= cap(m.stdPayload.data) {
-		m.stdPayload.Set(b)
-		return nil
-	}
-	if pool == nil {
-		return ErrMsgCapExceeded
-	}
-	buf := pool.Get(n)
-	buf.Set(b)
-	m.buf = buf
-	return nil
-}
-
-type PlainData []byte
-
-func (pd PlainData) Data() []byte {
-	return pd
-}
-
-func (pd *PlainData) Set(b []byte) {
-	n := len(b)
-	if n == 0 {
-		pd.Reset()
+		m.n = uint8(len(b))
+		m.ext = m.ext[:0]
 		return
 	}
-	buf := *pd
-	if n > cap(buf) {
-		n = cap(buf)
+	m.n = 0
+	if cap(m.ext) > 0 && &b[0] == &m.ext[:1][0] {
+		m.ext = m.ext[:len(b)] // b lies within ext's capacity
+		return
 	}
-	buf = buf[:n]
-
-	if &b[0] != &buf[0] {
-		copy(buf, b)
-	}
-	*pd = buf
+	m.ext = append(m.ext[:0], b...)
 }
 
-func (PlainData) Put() {}
-func (pd *PlainData) Reset() {
-	*pd = (*pd)[:0]
+// Clone returns a copy of m that does not share payload storage with m.
+func (m *Msg) Clone() Msg {
+	c := *m
+	c.ext = nil
+	if len(m.ext) > 0 {
+		c.ext = bytes.Clone(m.ext)
+	}
+	return c
 }
 
-// Reset sets the message back to the initial state.
+// Reset sets m back to the zero message. It keeps
+// m's payload storage for reuse.
 func (m *Msg) Reset() {
-	m.Id = 0
-	m.Flags = 0
-	if m.buf == nil {
-		return
-	}
-	m.buf.Reset()
+	ext := m.ext[:0]
+	*m = Msg{ext: ext}
 }
 
 var ValidFDSizes = []int{12, 16, 20, 24, 32, 48, 64}
@@ -237,8 +141,6 @@ func VerifyDataLenFD(n int) (next int, needsFD bool, err error) {
 }
 
 var ErrInvalidMsgLen = errors.New("invalid message length")
-
-var ErrMsgCapExceeded = errors.New("message capacity too small")
 
 // FromExpr parses a CAN message expression string and stores the
 // result into m, which may be a pre-initialized value.
@@ -289,15 +191,7 @@ func (m *Msg) FromExpr(expr string) error {
 			return nil
 		}
 	}
-	expr = dots.Replace(expr)
-	data := m.Data()
-	n := hex.DecodedLen(len(expr))
-	if n > cap(data) {
-		data = make([]byte, n)
-	} else {
-		data = data[:n]
-	}
-	_, err := hex.Decode(data, []byte(expr))
+	data, err := hex.DecodeString(dots.Replace(expr))
 	if err != nil {
 		return err
 	}
@@ -333,66 +227,4 @@ func (m *Msg) Format() string {
 	x := strings.ToUpper(hex.EncodeToString(data))
 	sb.WriteString(x)
 	return sb.String()
-}
-
-type DataBufPool interface {
-	Get(minSize int) DataBuffer
-}
-
-type simpleBufPool struct {
-	c chan *simpleDataBuf
-}
-
-func newSimpleBufPool(size int) *simpleBufPool {
-	p := &simpleBufPool{c: make(chan *simpleDataBuf, size)}
-	for range size / 2 {
-		p.c <- p.allocBuf()
-	}
-	return p
-}
-
-func (p *simpleBufPool) Get(n int) DataBuffer {
-	select {
-	case buf, ok := <-p.c:
-		if !ok {
-			panic("pool channel closed unexpectedly")
-		}
-
-		if cap(buf.PlainData) < n {
-			buf.PlainData = make([]byte, 0, n*3/2)
-		}
-		if buf.pool == nil {
-			buf.pool = p
-		}
-		return buf
-	default:
-	}
-	return p.allocBuf()
-}
-
-func (p *simpleBufPool) allocBuf() *simpleDataBuf {
-	buf := new(simpleDataBuf)
-	buf.PlainData = make([]byte, 0, 64)
-	buf.pool = p
-	return buf
-}
-
-func (p *simpleBufPool) put(buf DataBuffer) {
-	sb, ok := buf.(*simpleDataBuf)
-	if !ok {
-		return
-	}
-	select {
-	case p.c <- sb:
-	default:
-	}
-}
-
-type simpleDataBuf struct {
-	PlainData
-	pool *simpleBufPool
-}
-
-func (sd *simpleDataBuf) Put() {
-	sd.pool.put(sd)
 }

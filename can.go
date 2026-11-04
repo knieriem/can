@@ -18,7 +18,7 @@ func (e Error) Error() string {
 type Driver interface {
 	Name() string
 	//	Version() string
-	Open(env *Env, name string, conf *Config) (Device, error)
+	Open(name string, conf *Config) (Device, error)
 	Scan() []DeviceInfo
 }
 
@@ -113,13 +113,10 @@ func WithConfig(conf *Config) Option {
 // On success, a Device instance will be returned, else an error.
 func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
 	var p openProps
-	var env Env
 
 	for _, o := range opts {
 		o(&p)
 	}
-
-	env.BufPool = newSimpleBufPool(16)
 
 	if p.conf == nil {
 		f := strings.Split(deviceSpec, ",")
@@ -141,7 +138,7 @@ func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
 	if drvName == "" {
 		for _, drv := range drvlist {
 			// Drivers may modify the config; give each its own copy.
-			dev, err = drv.Open(&env, name, p.conf.clone())
+			dev, err = drv.Open(name, p.conf.clone())
 			if err == nil {
 				return
 			}
@@ -155,7 +152,7 @@ func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
 	}
 	for _, drv := range drvlist {
 		if drv.Name() == drvName {
-			return drv.Open(&env, name, p.conf)
+			return drv.Open(name, p.conf)
 		}
 	}
 	err = Error("driver not found: " + drvName)
@@ -169,10 +166,6 @@ func Scan() (list []DeviceInfo) {
 	return
 }
 
-type Env struct {
-	BufPool DataBufPool
-}
-
 type Unversioned struct{}
 
 func (Unversioned) Info() *DeviceInfo { return &DeviceInfo{} }
@@ -182,7 +175,7 @@ var UnsupportedDriver Driver = unsupported{}
 type unsupported struct{}
 
 func (unsupported) Name() string { return "unsupported" }
-func (unsupported) Open(_ *Env, name string, conf *Config) (Device, error) {
+func (unsupported) Open(name string, conf *Config) (Device, error) {
 	return nil, errors.New("not supported")
 }
 func (unsupported) Scan() []DeviceInfo { return nil }

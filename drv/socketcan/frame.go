@@ -97,7 +97,7 @@ func (f *frame) encode(msg *can.Msg, mtu int) (nw int, err error) {
 	return nw, nil
 }
 
-func (f *frame) decode(msg *can.Msg, nRead int, pool can.DataBufPool) error {
+func (f *frame) decode(msg *can.Msg, nRead int) {
 	id := f.id()
 	msg.Reset()
 	if id&linux.CAN_ERR_FLAG != 0 {
@@ -120,7 +120,7 @@ func (f *frame) decode(msg *can.Msg, nRead int, pool can.DataBufPool) error {
 				msg.Flags |= can.ErrorWarning
 			}
 		}
-		return nil
+		return
 	}
 
 	idMask := uint32(linux.CAN_SFF_MASK)
@@ -141,9 +141,9 @@ func (f *frame) decode(msg *can.Msg, nRead int, pool can.DataBufPool) error {
 		}
 	} else if id&linux.CAN_RTR_FLAG != 0 {
 		msg.Flags |= can.RTRMsg
-		return nil
+		return
 	}
-	return msg.Import(f.data(), pool)
+	msg.SetData(f.data())
 }
 
 func (f *frame) readFromN(r io.Reader, n int) (int, error) {

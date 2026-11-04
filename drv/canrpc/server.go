@@ -55,12 +55,7 @@ func (w *WireMsg) encode(m *can.Msg) {
 
 func (w *WireMsg) decode(m *can.Msg) {
 	m.Id = w.ID
-	if len(w.Data) <= 8 {
-		m.SetData(w.Data)
-	} else {
-		data := can.PlainData(w.Data)
-		m.Attach(&data)
-	}
+	m.SetData(w.Data)
 	m.Flags = w.Flags
 }
 
@@ -128,7 +123,6 @@ func loop(r can.Device, buf []WireMsg, ch rdChannels) {
 		n     int
 	)
 	mbuf := make([]can.Msg, 1)
-	mbuf[0].SetData(make([]byte, 0, 64))
 
 	for {
 		if len(avail) == 0 {

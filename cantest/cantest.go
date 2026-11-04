@@ -244,7 +244,7 @@ func newReader(d can.Device) *reader {
 				if buf[i].IsStatus() {
 					continue
 				}
-				r.c <- result{m: clone(&buf[i])}
+				r.c <- result{m: buf[i].Clone()}
 			}
 			if err != nil {
 				r.c <- result{err: err}
@@ -266,19 +266,6 @@ func (r *reader) next(timeout time.Duration) (can.Msg, error) {
 	case <-time.After(timeout):
 		return can.Msg{}, errors.New("timeout")
 	}
-}
-
-// clone copies m, so that the copy does not share
-// the payload buffer the driver reuses.
-func clone(m *can.Msg) can.Msg {
-	c := can.Msg{Id: m.Id, Flags: m.Flags, Rx: m.Rx}
-	data := can.PlainData(bytes.Clone(m.Data()))
-	if len(data) > 8 {
-		c.Attach(&data)
-	} else {
-		c.SetData(data)
-	}
-	return c
 }
 
 // flags returns the flags relevant for comparing data messages.

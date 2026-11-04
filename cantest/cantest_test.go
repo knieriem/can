@@ -1,7 +1,6 @@
 package cantest
 
 import (
-	"bytes"
 	"io"
 	"sync"
 	"testing"
@@ -49,10 +48,7 @@ func (d *memDev) WriteMsg(m *can.Msg) error {
 		if o == d {
 			continue
 		}
-		c := can.Msg{Id: m.Id, Flags: m.Flags}
-		data := can.PlainData(bytes.Clone(m.Data()))
-		c.Attach(&data)
-		o.c <- c
+		o.c <- m.Clone()
 	}
 	return nil
 }

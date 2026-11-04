@@ -79,7 +79,7 @@ type dev struct {
 	}
 }
 
-func (*driver) Open(_ *can.Env, devName string, conf *can.Config) (cd can.Device, err error) {
+func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error) {
 	defer wrapErr("open", &err)
 
 	hwList, err := parseProcfile()
@@ -211,9 +211,7 @@ func (d *dev) decode(dst *can.Msg, m *api.Msg, µs int64) (st api.Status) {
 	}
 	dst.Id = m.ID
 	dst.Flags = msgFlagsMap.Decode(int(m.MSGTYPE))
-	data := dst.Data()[:m.LEN]
-	copy(data, m.DATA[:])
-	dst.SetData(data)
+	dst.SetData(m.DATA[:min(int(m.LEN), len(m.DATA))])
 	return
 }
 

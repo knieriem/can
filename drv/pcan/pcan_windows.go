@@ -138,7 +138,7 @@ func (*driver) Scan() (list []can.DeviceInfo) {
 	return
 }
 
-func (*driver) Open(_ *can.Env, devName string, conf *can.Config) (cd can.Device, err error) {
+func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error) {
 	defer wrapErr("open", &err)
 	d := new(dev)
 
@@ -395,13 +395,7 @@ func (d *dev) decode(dst *can.Msg, id uint32, msgType uint8, apiData []byte, µs
 	}
 	dst.Id = id
 	dst.Flags = msgFlagsMap.Decode(int(msgType))
-	dstData := dst.Data()
-	if cap(dstData) < len(apiData) {
-		return can.ErrMsgCapExceeded
-	}
-	data := dstData[:len(apiData)]
-	copy(data, apiData)
-	dst.SetData(data)
+	dst.SetData(apiData)
 	return nil
 }
 
