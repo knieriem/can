@@ -31,21 +31,29 @@ func RegisterDriver(drv Driver) {
 	drvlist = append(drvlist, drv)
 }
 
-// The Device interface gives access to a CAN Device.
-// Read and Write calls will block if no messages are
-// available to be read or if the transmit buffer
-// of the driver is full.
+// A Device is an open CAN channel.
+//
+// Read may be called by one goroutine at a time. WriteMsg may be
+// called concurrently with Read and with itself. Close may be called
+// at any time, from any goroutine, and more than once: it unblocks
+// pending Read and WriteMsg calls, which then return an error
+// wrapping [ErrClosed]; so do all calls after Close, including
+// further Close calls. ID and Info do not change after Open.
 type Device interface {
-	Read([]Msg) (n int, err error)
+	// Read blocks until at least one message is available,
+	// stores up to len(buf) messages into buf, and returns their
+	// number. It reuses the payload storage of buf's messages.
+	// An error means the device can no longer be read.
+	Read(buf []Msg) (n int, err error)
 
-	// Writes a message into the driver transmit buffer.
-	// The ownership of the message will not be taken.
-	WriteMsg(*Msg) error
+	// WriteMsg queues m for transmission. It does not retain m.
+	// If the transmit queue is full, it returns an error wrapping
+	// [ErrTxQueueFull]; the caller decides whether to retry.
+	WriteMsg(m *Msg) error
 
-	// As an alternative to WriteMsg, Write can be used
-	// if more than one message should be handed over
-	// to the driver at once (if the driver is able to do that).
-	Write([]Msg) (n int, err error)
+	// Write calls WriteMsg for each message, and stops
+	// at the first error.
+	Write(msgs []Msg) (n int, err error)
 
 	ID() string
 	Info() *DeviceInfo
@@ -179,6 +187,10 @@ func (unsupported) Open(name string, conf *Config) (Device, error) {
 	return nil, errors.New("not supported")
 }
 func (unsupported) Scan() []DeviceInfo { return nil }
+
+// ErrClosed is returned, wrapped, by a Device's methods
+// once the device has been closed.
+var ErrClosed = Error("device closed")
 
 // ErrTxQueueFull is returned when a Msg could not be added
 // to the devices' transmit queue. On Linux, it is returned
