@@ -13,10 +13,11 @@ import (
 	"strconv"
 	"syscall"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/knieriem/can"
 	"github.com/knieriem/can/drv"
 	"github.com/knieriem/can/drv/pcan/internal/api"
-	"github.com/knieriem/g/syscall/epoll"
 )
 
 func driverPresent() bool {
@@ -67,12 +68,20 @@ func (*driver) Scan() (list []can.DeviceInfo) {
 	return
 }
 
+// dev accesses a pcan character device. The file is registered with
+// Go's runtime poller (os.OpenFile does this for pollable descriptors),
+// and all ioctls are issued through its syscall.RawConn, so that
+//   - a blocked Read parks the goroutine in the poller, not an OS thread,
+//   - Close unblocks a pending Read (it returns os.ErrClosed),
+//   - the descriptor is never closed while an ioctl is using it.
+//
+// Note: never call d.file.Fd(), it would switch the file back to
+// blocking mode and detach it from the poller.
 type dev struct {
-	file    io.Closer
-	h       api.Fd
+	file    *os.File
+	rc      syscall.RawConn
 	info    can.DeviceInfo
 	receive struct {
-		epoll  *epoll.Pollster
 		status api.Status
 		t0     can.Time
 		t0val  int64
@@ -97,6 +106,11 @@ func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error)
 		return
 	}
 
+	bitrate, err := timingConf(conf)
+	if err != nil {
+		return nil, err
+	}
+
 	sysName := bus.sysName(ch.minor)
 	f, err := os.OpenFile(sysName, os.O_RDWR, 0)
 	if err != nil {
@@ -104,7 +118,14 @@ func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error)
 	}
 	d := new(dev)
 	d.file = f
-	d.h = api.Fd(f.Fd())
+	defer func() {
+		if err != nil {
+			f.Close()
+		}
+	}()
+	if d.rc, err = f.SyscallConn(); err != nil {
+		return nil, err
+	}
 	d.info = can.DeviceInfo{
 		ID:     bus.name + strconv.Itoa(iDev+1),
 		Device: sysName,
@@ -112,15 +133,10 @@ func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error)
 	}
 	d.setupInfo()
 
-	bitrate, err := timingConf(conf)
-	if err != nil {
-		return nil, err
-	}
-
 	var i api.Init
 	i.WBTR0BTR1 = bitrate
 	i.UcCANMsgType = api.MsgExtended
-	err = d.h.Init(&i)
+	err = d.control(func(h api.Fd) error { return h.Init(&i) })
 	if err != nil {
 		if runtime.GOARCH == "386" && err == syscall.EINVAL {
 			err = errors.New("32-bit program / 64-bit driver mismatch")
@@ -128,17 +144,60 @@ func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error)
 		return nil, err
 	}
 
-	if d.receive.epoll, err = epoll.NewPollster(); err != nil {
-		return
+	err = d.control(func(h api.Fd) error { return h.SetMsgFilter(nil) })
+	if err != nil {
+		return nil, err
 	}
-	if _, err = d.receive.epoll.AddFD(int(d.h), 'r', true); err != nil {
-		return
+	return d, nil
+}
+
+// control runs fn with the raw descriptor, without waiting for readiness.
+func (d *dev) control(fn func(api.Fd) error) error {
+	var err error
+	if cerr := d.rc.Control(func(fd uintptr) { err = fn(api.Fd(fd)) }); cerr != nil {
+		return cerr
 	}
-	d.h.SetMsgFilter(nil)
+	return err
+}
 
-	cd = d
+var errNoMsg = errors.New("no message pending")
 
-	return
+// pollReady reports, without blocking, whether fd is ready for events.
+func pollReady(fd uintptr, events int16) bool {
+	pfd := []unix.PollFd{{Fd: int32(fd), Events: events}}
+	for {
+		n, err := unix.Poll(pfd, 0)
+		if err == unix.EINTR {
+			continue
+		}
+		return err == nil && n > 0 && pfd[0].Revents&events != 0
+	}
+}
+
+// readMsg reads one message from the driver queue. If wait is true,
+// it blocks in the runtime poller until a message is available;
+// otherwise it returns errNoMsg if the queue is empty.
+//
+// Readiness is checked with a zero-timeout poll before the ioctl,
+// so this does not depend on whether the pcan driver honors
+// O_NONBLOCK for its READ_MSG ioctl.
+func (d *dev) readMsg(m *api.RMsg, wait bool) error {
+	var err error
+	cerr := d.rc.Read(func(fd uintptr) bool {
+		if !pollReady(fd, unix.POLLIN) {
+			if wait {
+				return false // park until the poller reports readability
+			}
+			err = errNoMsg
+			return true
+		}
+		err = api.Fd(fd).ReadMsg(m)
+		return !(wait && errors.Is(err, unix.EAGAIN))
+	})
+	if cerr != nil {
+		return cerr
+	}
+	return err
 }
 
 func (d *dev) Read(buf []can.Msg) (n int, err error) {
@@ -152,21 +211,15 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 	}()
 
 	for n < len(buf) {
-		if n > 0 && d.h.Status().Test(api.ErrQRCVEMPTY) {
-			return
-		}
-		_, mode, err1 := d.receive.epoll.WaitFD(1e9)
+		err1 := d.readMsg(&m, n == 0)
 		if err1 != nil {
-			err = err1
-			return
-		}
-		if mode == 0 {
-			// WaitFD timeout
-			continue
-		}
-		err = d.h.ReadMsg(&m)
-		if err != nil {
-			break
+			if err1 == errNoMsg || n > 0 {
+				return n, nil
+			}
+			if errors.Is(err1, os.ErrClosed) {
+				return 0, io.EOF
+			}
+			return 0, err1
 		}
 
 		µs := int64(m.DwTime)*1000 + int64(m.WUsec)
@@ -223,15 +276,25 @@ func (d *dev) WriteMsg(cm *can.Msg) (err error) {
 	if cm.IsStatus() {
 		return
 	}
+	if len(cm.Data()) > 8 || cm.Test(can.ForceFD) || cm.Test(can.FDSwitchBitrate) {
+		return can.ErrInvalidMsgLen
+	}
 	encode(&m, cm)
 
-	err = d.h.WriteMsg(&m)
-
+	// If the driver honors O_NONBLOCK and its TX queue is full,
+	// the ioctl returns EAGAIN, and we wait for writability.
+	// If it doesn't, the ioctl itself blocks, as before.
+	cerr := d.rc.Write(func(fd uintptr) bool {
+		err = api.Fd(fd).WriteMsg(&m)
+		return !errors.Is(err, unix.EAGAIN)
+	})
+	if cerr != nil {
+		err = cerr
+	}
 	return
 }
 
 func (d *dev) Close() (err error) {
-	d.receive.epoll.Close()
 	err = d.file.Close()
 	wrapErr("close", &err)
 	return
@@ -240,7 +303,7 @@ func (d *dev) Close() (err error) {
 func (d *dev) setupInfo() {
 	var diag api.Diag
 
-	err := d.h.Diag(&diag)
+	err := d.control(func(h api.Fd) error { return h.Diag(&diag) })
 	if err == nil {
 		d.info.SystemDriver = diag.Version()
 	}
