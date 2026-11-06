@@ -7,7 +7,6 @@ package pcan
 import (
 	"encoding/binary"
 	"errors"
-	"io"
 	"os"
 	"runtime"
 	"strconv"
@@ -72,7 +71,7 @@ func (*driver) Scan() (list []can.DeviceInfo) {
 // Go's runtime poller (os.OpenFile does this for pollable descriptors),
 // and all ioctls are issued through its syscall.RawConn, so that
 //   - a blocked Read parks the goroutine in the poller, not an OS thread,
-//   - Close unblocks a pending Read (it returns os.ErrClosed),
+//   - Close unblocks a pending Read, which returns can.ErrClosed,
 //   - the descriptor is never closed while an ioctl is using it.
 //
 // Note: never call d.file.Fd(), it would switch the file back to
@@ -216,10 +215,7 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 			if err1 == errNoMsg || n > 0 {
 				return n, nil
 			}
-			if errors.Is(err1, os.ErrClosed) {
-				return 0, io.EOF
-			}
-			return 0, err1
+			return 0, closedErr(err1)
 		}
 
 		µs := int64(m.DwTime)*1000 + int64(m.WUsec)
@@ -281,23 +277,29 @@ func (d *dev) WriteMsg(cm *can.Msg) (err error) {
 	}
 	encode(&m, cm)
 
-	// If the driver honors O_NONBLOCK and its TX queue is full,
-	// the ioctl returns EAGAIN, and we wait for writability.
-	// If it doesn't, the ioctl itself blocks, as before.
-	cerr := d.rc.Write(func(fd uintptr) bool {
-		err = api.Fd(fd).WriteMsg(&m)
-		return !errors.Is(err, unix.EAGAIN)
-	})
-	if cerr != nil {
-		err = cerr
+	// If the driver's TX queue is full, the ioctl returns EAGAIN, as
+	// the file is in non-blocking mode. (A driver ignoring O_NONBLOCK
+	// would block here instead.)
+	err = d.control(func(h api.Fd) error { return h.WriteMsg(&m) })
+	if errors.Is(err, unix.EAGAIN) {
+		err = can.ErrTxQueueFull
 	}
-	return
+	return closedErr(err)
 }
 
 func (d *dev) Close() (err error) {
-	err = d.file.Close()
+	err = closedErr(d.file.Close())
 	wrapErr("close", &err)
 	return
+}
+
+// closedErr translates the error of an operation on a closed file
+// into can.ErrClosed.
+func closedErr(err error) error {
+	if errors.Is(err, os.ErrClosed) {
+		return can.ErrClosed
+	}
+	return err
 }
 
 func (d *dev) setupInfo() {
