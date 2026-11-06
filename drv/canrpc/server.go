@@ -14,7 +14,8 @@ import (
 type object struct {
 	dev can.Device
 
-	rch       rdChannels
+	rch       <-chan WireMsg // messages read from dev; closed after a read error
+	err       error          // the read error; valid once rch is closed
 	unblockch chan bool
 }
 
@@ -29,7 +30,9 @@ func Register(r Registrar, dev can.Device, name string) error {
 	o := new(object)
 	o.dev = dev
 	o.unblockch = make(chan bool, 1)
-	o.rch = channelizeReader(dev, nil)
+	ch := make(chan WireMsg)
+	o.rch = ch
+	go o.readLoop(ch)
 	if name != "" {
 		name = "Can-" + name
 	} else {
@@ -59,25 +62,33 @@ func (w *WireMsg) decode(m *can.Msg) {
 	m.Flags = w.Flags
 }
 
-func (d *object) Read(nw int, r *[]WireMsg) (err error) {
-	select {
-	case in := <-d.rch.Data:
-		n := len(in.Data)
-		if n > nw {
-			n = nw
-		}
-		//		fmt.Fprint(os.Stderr, "r")
-		err = in.Err
-		if err == nil {
-			*r = make([]WireMsg, n)
-			copy(*r, in.Data[:n])
-		}
-		d.rch.Req <- n
-	case <-d.unblockch:
-		//		fmt.Fprint(os.Stderr, "U")
-		err = io.EOF
+// Read returns at least one and at most nw messages. After the device
+// failed, it returns the device's read error, also on later calls.
+func (o *object) Read(nw int, r *[]WireMsg) error {
+	if nw <= 0 {
+		return nil
 	}
-	return
+	select {
+	case w, ok := <-o.rch:
+		if !ok {
+			return o.err
+		}
+		*r = append((*r)[:0], w)
+	case <-o.unblockch:
+		return io.EOF
+	}
+	for len(*r) < nw {
+		select {
+		case w, ok := <-o.rch:
+			if !ok {
+				return nil // report o.err with the next call
+			}
+			*r = append(*r, w)
+		default:
+			return nil
+		}
+	}
+	return nil
 }
 
 func (o *object) Write(w []WireMsg, n *int) (err error) {
@@ -106,59 +117,21 @@ func (o *object) Close(_ int, _ *int) (err error) {
 	return
 }
 
-type data struct {
-	Data []WireMsg
-	Err  error
-}
-
-type rdChannels struct {
-	Req  chan int
-	Data chan data
-}
-
-func loop(r can.Device, buf []WireMsg, ch rdChannels) {
-	var (
-		d     data
-		avail = buf[:0]
-		n     int
-	)
-	mbuf := make([]can.Msg, 1)
-
+// readLoop reads messages from the device and hands them to Read
+// calls. After a read error, it records the error and closes ch.
+func (o *object) readLoop(ch chan<- WireMsg) {
+	defer close(ch)
+	buf := make([]can.Msg, 16)
 	for {
-		if len(avail) == 0 {
-			if nread, err := r.Read(mbuf); err == nil {
-				avail = buf[:nread]
-				(&buf[0]).encode(&mbuf[0])
-			} else {
-				d.Err = err
-			}
+		n, err := o.dev.Read(buf)
+		for i := range buf[:n] {
+			var w WireMsg
+			w.encode(&buf[i])
+			ch <- w
 		}
-		d.Data = avail
-
-		select {
-		case ch.Data <- d:
-			n = <-ch.Req
-		case n = <-ch.Req:
+		if err != nil {
+			o.err = err
+			return
 		}
-		if n == 0 {
-			break
-		}
-		avail = avail[n:]
 	}
-	close(ch.Data)
-}
-
-// Create a wrapper around the Reader of a can.Device. A pair of
-// channels is returned that can be used to request a number of messages,
-// and to receive a []can.Msg containing the messages actually read.
-func channelizeReader(r can.Device, buf []WireMsg) (ch rdChannels) {
-	if buf == nil {
-		buf = make([]WireMsg, 32)
-	}
-	ch.Req = make(chan int)
-	ch.Data = make(chan data)
-
-	go loop(r, buf, ch)
-
-	return
 }

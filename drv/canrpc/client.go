@@ -22,10 +22,13 @@
 package canrpc
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"net/rpc"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/knieriem/can"
 )
@@ -42,8 +45,9 @@ type Caller interface {
 type device struct {
 	Caller
 	io.Closer
-	path string
-	cl   sync.Mutex
+	path   string
+	cl     sync.Mutex
+	closed atomic.Bool
 	can.Unversioned
 }
 
@@ -92,17 +96,23 @@ func (d *device) ID() string {
 }
 
 func (d *device) Read(buf []can.Msg) (n int, err error) {
+	if d.closed.Load() {
+		return 0, wrapErr("read", can.ErrClosed)
+	}
 	var r []WireMsg
 	d.cl.Lock()
 	err = d.call("Read", len(buf), &r)
 	d.cl.Unlock()
-	if err == nil {
-		for i := range r {
-			r[i].decode(&buf[i])
+	if err != nil {
+		if d.closed.Load() {
+			err = can.ErrClosed
 		}
-		n = len(r)
+		return 0, wrapErr("read", err)
 	}
-	return
+	for i := range r {
+		r[i].decode(&buf[i])
+	}
+	return len(r), nil
 }
 
 func (d *device) Write(buf []can.Msg) (n int, err error) {
@@ -115,26 +125,53 @@ func (d *device) Write(buf []can.Msg) (n int, err error) {
 	return len(buf), nil
 }
 
-func (d *device) WriteMsg(m *can.Msg) (err error) {
+func (d *device) WriteMsg(m *can.Msg) error {
+	if d.closed.Load() {
+		return wrapErr("write", can.ErrClosed)
+	}
 	var w WireMsg
 	w.encode(m)
-	err = d.call("WriteMsg", w, nil)
-	return
+	if err := d.call("WriteMsg", w, nil); err != nil {
+		return wrapErr("write", err)
+	}
+	return nil
 }
 
-func (d *device) Close() (err error) {
-	err = d.call("Close", 0, nil)
-
-	if d.Closer == nil {
-		return
+func (d *device) Close() error {
+	if d.closed.Swap(true) {
+		return wrapErr("close", can.ErrClosed)
 	}
-	// before closing the RPC connection, wait until the last Read
-	// call returned, which should have been interrupted by the
-	// Close call above.
-	d.cl.Lock()
-	d.Closer.Close()
-	d.cl.Unlock()
-	return
+	// Unblock a pending Read on the server side.
+	err := d.call("Close", 0, nil)
+
+	if d.Closer != nil {
+		// Wait until the last Read call returned before closing
+		// the RPC connection.
+		d.cl.Lock()
+		d.Closer.Close()
+		d.cl.Unlock()
+	}
+	if err != nil {
+		return wrapErr("close", err)
+	}
+	return nil
+}
+
+// wrapErr adds context to err. As net/rpc transports server errors as
+// strings only, it recognizes ErrClosed and ErrTxQueueFull by their text.
+func wrapErr(op string, err error) error {
+	var se rpc.ServerError
+	switch {
+	case errors.Is(err, rpc.ErrShutdown):
+		err = can.ErrClosed
+	case errors.As(err, &se):
+		if s := string(se); strings.Contains(s, can.ErrClosed.Error()) {
+			err = can.ErrClosed
+		} else if strings.Contains(s, can.ErrTxQueueFull.Error()) {
+			err = can.ErrTxQueueFull
+		}
+	}
+	return fmt.Errorf("canrpc: %s: %w", op, err)
 }
 
 func (d *device) call(fnName string, arg, reply interface{}) error {
