@@ -19,15 +19,16 @@ subdirectory `drv`:
 
 | Driver    | Adapters            | Platforms      | CAN 2.0 | FD            |
 |-----------|---------------------|----------------|:-------:|---------------|
-| pcan      | PCAN-USB            | Linux, Windows |    ☑    | —             |
-| pcan      | PCAN-USB FD         | Linux*, Windows |    ☑    | ☑ (Windows) |
+| pcan      | PCAN-USB, PCAN-USB FD | Windows, Linux* | ☑   | ☑ (Windows)   |
 |           |
 | socketcan | any adapter supported by SocketCAN | Linux | ☑ | ☑             |
 |           |
 | rpc       | remote CAN adapters |                |    ☑    | ☑             |
 
-\* the FD mode of PCAN-USB FD may be used on Linux via the `socketcan` driver,
-but not yet via the `pcan` character-device driver.
+\* On Linux, the `pcan` driver uses PEAK's out-of-tree character-device
+module, classic CAN only. This backend is deprecated:
+use the `socketcan` driver with the mainline `peak_usb` kernel driver instead,
+which also supports CAN FD.
 
 Windows Support includes the arm64 architecture.
 
@@ -135,7 +136,7 @@ similar but less complete compared to what [can-utils]' `cansend` provides.
 
 ## Tested Adapters
 
-- PCAN-USB, PCAN-USB FD (`socketcan`, `pcan`; Linux, Windows)
+- PCAN-USB, PCAN-USB FD (`pcan` on Windows; `socketcan` on Linux)
 - MCP2518FD (`socketcan`; Linux on RPi)
 - [candleLight FD] (USB/STM32G0B1, `socketcan`; Linux)
 
