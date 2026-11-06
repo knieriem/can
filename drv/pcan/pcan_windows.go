@@ -13,6 +13,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 
 	"golang.org/x/sys/windows"
@@ -115,6 +117,12 @@ type dev struct {
 	msg    api.Msg
 	fdMsg  api.MsgFD
 	fdMode bool
+
+	// closed is set by the first Close. readMu is held by Read
+	// for its whole duration, so that Close can wait for a pending
+	// Read to return before it closes the receive event handle.
+	closed atomic.Bool
+	readMu sync.Mutex
 }
 
 func (*driver) Scan() (list []can.DeviceInfo) {
@@ -259,6 +267,14 @@ func (d *dev) Info() *can.DeviceInfo {
 
 func (d *dev) Read(buf []can.Msg) (n int, err error) {
 	defer wrapErr("read", &err)
+	defer func() {
+		if err != nil && d.closed.Load() {
+			err = can.ErrClosed
+		}
+	}()
+
+	d.readMu.Lock()
+	defer d.readMu.Unlock()
 
 	prevSt := d.receive.status
 	defer func() {
@@ -268,6 +284,12 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 	block := false
 	hasBlocked := false
 	for n < len(buf) {
+		if d.closed.Load() {
+			if n > 0 {
+				return n, nil
+			}
+			return 0, can.ErrClosed
+		}
 		st := api.OK
 		err1 := d.readMsg(&buf[n])
 		if err1 != nil {
@@ -339,9 +361,9 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 			case syscall.WAIT_OBJECT_0:
 				hasBlocked = true
 			case syscall.WAIT_FAILED:
-				err = errors.New("pcan: read: WaitForSingleObject failed: " + err1.Error())
+				return n, fmt.Errorf("WaitForSingleObject failed: %w", err1)
 			default:
-				err = errors.New("pcan: read: WaitForSingleObject: unexpected error")
+				return n, errors.New("WaitForSingleObject: unexpected result")
 			}
 			block = false
 		}
@@ -400,24 +422,35 @@ func (d *dev) decode(dst *can.Msg, id uint32, msgType uint8, apiData []byte, µs
 }
 
 func (d *dev) WriteMsg(cm *can.Msg) (err error) {
+	defer wrapErr("write", &err)
+	if d.closed.Load() {
+		return can.ErrClosed
+	}
 	if cm.IsStatus() {
 		return nil
 	}
 
+	var st api.Status
 	if d.fdMode {
 		var m api.MsgFD
-		encodeFD(&m, cm)
-		err = d.h.WriteMsgFD(&m).Err()
+		if err := encodeFD(&m, cm); err != nil {
+			return err
+		}
+		st = d.h.WriteMsgFD(&m)
 	} else {
 		var m api.Msg
 		encode(&m, cm)
-		err = d.h.WriteMsg(&m).Err()
+		st = d.h.WriteMsg(&m)
 	}
-	if err != nil {
-		wrapErr("write", &err)
-		return err
+	switch {
+	case st == api.OK:
+		return nil
+	case d.closed.Load():
+		return can.ErrClosed
+	case st.Test(api.ErrQXMTFULL):
+		return can.ErrTxQueueFull
 	}
-	return nil
+	return st
 }
 
 func encodeFD(dst *api.MsgFD, src *can.Msg) error {
@@ -437,11 +470,20 @@ func encodeFD(dst *api.MsgFD, src *can.Msg) error {
 }
 
 func (d *dev) Close() (err error) {
+	defer wrapErr("close", &err)
+	if d.closed.Swap(true) {
+		return can.ErrClosed
+	}
 	err = d.h.Uninitialize().Err()
+
+	// Wake a Read waiting for the receive event, and let it return
+	// before closing the handle: closing a handle while a wait on it
+	// is pending is undefined behavior.
 	windows.SetEvent(d.receive.ev)
+	d.readMu.Lock()
 	windows.CloseHandle(d.receive.ev)
-	wrapErr("close", &err)
-	return
+	d.readMu.Unlock()
+	return err
 }
 
 func (d *dev) setupInfo() {
