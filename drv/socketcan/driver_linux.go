@@ -191,6 +191,7 @@ skipConfig:
 			unix.Close(fd)
 		}
 	}()
+	setRcvBuf(fd)
 
 	info, err := link.Info()
 	if err != nil {
@@ -272,6 +273,20 @@ func setupSocket(dev string) (int, error) {
 		return -1, err
 	}
 	return fd, nil
+}
+
+// rcvBufSize is the socket receive buffer the driver requests.
+// At 500 kbit/s it holds roughly a second of frames.
+const rcvBufSize = 1 << 20
+
+// setRcvBuf enlarges the socket receive buffer. Without CAP_NET_ADMIN,
+// the kernel caps the size at net.core.rmem_max. Errors are ignored:
+// a smaller buffer still works.
+func setRcvBuf(fd int) {
+	if unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUFFORCE, rcvBufSize) == nil {
+		return
+	}
+	_ = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUF, rcvBufSize)
 }
 
 // pollableFile turns fd into an *os.File, that is managed by Go's runtime poller
