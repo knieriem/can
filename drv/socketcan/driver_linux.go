@@ -185,6 +185,12 @@ skipConfig:
 	if err != nil {
 		return nil, wrapErr("open", err)
 	}
+	ok := false
+	defer func() {
+		if !ok {
+			unix.Close(fd)
+		}
+	}()
 
 	info, err := link.Info()
 	if err != nil {
@@ -243,28 +249,26 @@ skipConfig:
 	d.file = file
 	setupInfo(&d.info, info)
 	cleanupPriv = nil
+	ok = true
 	return d, nil
 }
 
 // setupSocket is setting up a raw CAN socket, as described in
 // https://www.kernel.org/doc/html/latest/networking/can.html#how-to-use-socketcan
-func setupSocket(dev string) (fd int, err error) {
-	fd, err = unix.Socket(unix.AF_CAN, unix.SOCK_RAW, unix.CAN_RAW)
+func setupSocket(dev string) (int, error) {
+	fd, err := unix.Socket(unix.AF_CAN, unix.SOCK_RAW, unix.CAN_RAW)
 	if err != nil {
 		return -1, err
 	}
-
 	ifr, err := unix.NewIfreq(dev)
-	if err != nil {
-		return -1, err
+	if err == nil {
+		err = unix.IoctlIfreq(fd, unix.SIOCGIFINDEX, ifr)
 	}
-	err = unix.IoctlIfreq(fd, unix.SIOCGIFINDEX, ifr)
-	if err != nil {
-		return -1, err
+	if err == nil {
+		err = unix.Bind(fd, &unix.SockaddrCAN{Ifindex: int(ifr.Uint32())})
 	}
-
-	err = unix.Bind(fd, &unix.SockaddrCAN{Ifindex: int(ifr.Uint32())})
 	if err != nil {
+		unix.Close(fd)
 		return -1, err
 	}
 	return fd, nil
