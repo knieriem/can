@@ -310,7 +310,7 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 	f := d.recvBuf
 	nRead, err := f.readFromN(d.file, d.mtu)
 	if err != nil {
-		return 0, wrapErr("read", err)
+		return 0, wrapErr("read", closedErr(err))
 	}
 	f.decode(&buf[0], nRead)
 	return 1, nil
@@ -335,7 +335,7 @@ func (d *dev) WriteMsg(msg *can.Msg) error {
 		if errors.Is(err, syscall.ENOBUFS) {
 			err = can.ErrTxQueueFull
 		}
-		return wrapErr("write", err)
+		return wrapErr("write", closedErr(err))
 	}
 	return nil
 }
@@ -354,13 +354,22 @@ func (d *dev) Write(msgs []can.Msg) (n int, err error) {
 func (d *dev) Close() error {
 	err := d.file.Close()
 	if err != nil {
-		return wrapErr("close", err)
+		return wrapErr("close", closedErr(err))
 	}
 	return nil
 }
 
 func (d *dev) Info() *can.DeviceInfo {
 	return &d.info
+}
+
+// closedErr translates the error of an operation on a closed file
+// into can.ErrClosed.
+func closedErr(err error) error {
+	if errors.Is(err, os.ErrClosed) {
+		return can.ErrClosed
+	}
+	return err
 }
 
 func wrapErr(fnName string, err error) error {
