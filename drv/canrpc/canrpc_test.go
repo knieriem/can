@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/knieriem/can"
+	"github.com/knieriem/can/cantest"
 )
 
 // fakeDev delivers messages sent on c; Read fails with the
@@ -134,4 +135,19 @@ func TestServerErrClosed(t *testing.T) {
 	if _, err := readTimeout(d); !errors.Is(err, can.ErrClosed) {
 		t.Errorf("got %v, want ErrClosed", err)
 	}
+}
+
+// TestSuite runs the cantest suite through RPC connections
+// to devices on an in-memory bus.
+func TestSuite(t *testing.T) {
+	bus := cantest.NewBus()
+	open := func() (can.Device, error) {
+		dev, err := bus.Open()
+		if err != nil {
+			return nil, err
+		}
+		t.Cleanup(func() { dev.Close() })
+		return connect(t, dev), nil
+	}
+	cantest.Run(t, open, open, cantest.Options{FD: true})
 }

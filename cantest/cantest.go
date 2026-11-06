@@ -43,6 +43,7 @@ func Run(t *testing.T, openTX, openRX Opener, opt Options) {
 	t.Run("RoundTrip", s.testRoundTrip)
 	t.Run("ConcurrentWrite", s.testConcurrentWrite)
 	t.Run("CloseUnblocksRead", s.testCloseUnblocksRead)
+	t.Run("UseAfterClose", s.testUseAfterClose)
 }
 
 type suite struct {
@@ -217,9 +218,34 @@ func (s *suite) testCloseUnblocksRead(t *testing.T) {
 	}
 	select {
 	case err := <-done:
-		t.Logf("read returned: %v", err)
+		if !errors.Is(err, can.ErrClosed) {
+			t.Errorf("read after close: %v, want ErrClosed", err)
+		}
 	case <-time.After(s.opt.Timeout):
 		t.Fatal("read still blocked after close")
+	}
+}
+
+// testUseAfterClose checks that all methods return ErrClosed after
+// Close, and that a second Close is harmless.
+func (s *suite) testUseAfterClose(t *testing.T) {
+	d, err := s.openTX()
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if err := d.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	var m can.Msg
+	m.Id = 0x123
+	if err := d.WriteMsg(&m); !errors.Is(err, can.ErrClosed) {
+		t.Errorf("WriteMsg: %v, want ErrClosed", err)
+	}
+	if _, err := d.Read(make([]can.Msg, 1)); !errors.Is(err, can.ErrClosed) {
+		t.Errorf("Read: %v, want ErrClosed", err)
+	}
+	if err := d.Close(); !errors.Is(err, can.ErrClosed) {
+		t.Errorf("second Close: %v, want ErrClosed", err)
 	}
 }
 
