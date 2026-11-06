@@ -178,6 +178,10 @@ func (e wrappedError) Error() string {
 	return "pcan: " + e.fnName + ": " + e.error.Error()
 }
 
+func (e wrappedError) Unwrap() error {
+	return e.error
+}
+
 func wrapErr(fnName string, pErr *error) {
 	err := *pErr
 	if err != nil {
