@@ -237,6 +237,10 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 	return
 }
 
+// errBusPassive is zero: the chardev driver has no status bit for
+// an error passive controller.
+const errBusPassive api.Status = 0
+
 var msgFlagsMap = drv.FlagsMap{
 	{can.RTRMsg, api.MsgRtr},
 	{can.ExtFrame, api.MsgExtended},
@@ -248,16 +252,15 @@ func (d *dev) decode(dst *can.Msg, m *api.Msg, µs int64) (st api.Status) {
 		d.receive.t0 = can.Now()
 		d.receive.t0val = µs
 	}
-	dst.Rx.Time = d.receive.t0 + can.Time(µs-d.receive.t0val)
+	t := d.receive.t0 + can.Time(µs-d.receive.t0val)
 
 	if m.MSGTYPE&api.MsgStatus != 0 {
 		st = api.Status(binary.BigEndian.Uint32(m.DATA[0:4]))
-		dst.Flags = errFlagsMap.Decode(int(st))
-		dst.Flags |= can.StatusMsg
-		dst.Id = 0
-		dst.SetData(nil)
+		dst.SetStatus(status(st))
+		dst.Rx.Time = t
 		return
 	}
+	dst.Rx.Time = t
 	dst.Id = m.ID
 	dst.Flags = msgFlagsMap.Decode(int(m.MSGTYPE))
 	dst.SetData(m.DATA[:min(int(m.LEN), len(m.DATA))])

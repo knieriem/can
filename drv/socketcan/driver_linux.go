@@ -64,6 +64,7 @@ type dev struct {
 		t0    can.Time
 		t0val int64
 	}
+	state can.BusState // last known bus state; used by Read only
 }
 
 func (d *dev) ID() string {
@@ -331,7 +332,7 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 	if err != nil {
 		return 0, wrapErr("read", closedErr(err))
 	}
-	f.decode(&buf[0], nRead)
+	f.decode(&buf[0], nRead, &d.state)
 	return 1, nil
 }
 

@@ -11,7 +11,6 @@ import (
 	"strconv"
 
 	"github.com/knieriem/can"
-	"github.com/knieriem/can/drv"
 	api "github.com/knieriem/can/drv/pcan/internal/api"
 )
 
@@ -126,11 +125,21 @@ func (buses busList) lookupName(name string) (b *bus, i int, err error) {
 	return
 }
 
-var errFlagsMap = drv.FlagsMap{
-	{can.ErrorActive, int(api.ErrBUSLIGHT)},
-	{can.ErrorPassive, int(api.ErrBUSHEAVY)},
-	{can.BusOff, int(api.ErrBUSOFF)},
-	{can.DataOverrun, int(api.ErrOVERRUN)},
+// status translates a PCAN status word.
+func status(st api.Status) can.Status {
+	var s can.Status
+	switch {
+	case st&api.ErrBUSOFF != 0:
+		s.State = can.BusOff
+	case st&errBusPassive != 0:
+		s.State = can.ErrorPassive
+	case st&(api.ErrBUSHEAVY|api.ErrBUSLIGHT) != 0:
+		s.State = can.ErrorWarning // BUSHEAVY is also named BUSWARNING
+	}
+	if st&(api.ErrOVERRUN|api.ErrQOVERRUN) != 0 {
+		s.Events |= can.RxOverflow
+	}
+	return s
 }
 
 func encode(dst *api.Msg, src *can.Msg) {

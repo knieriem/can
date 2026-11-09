@@ -13,35 +13,25 @@ import (
 	"strings"
 )
 
-// Message Flags.
+// Flags describe the format of a frame.
+//
+// The values are part of canrpc's wire format: never renumber them.
+// Bits 2 and 5 to 11 carried status flags before v0.6.
 type Flags int
 
 const (
-	// message type
-	ExtFrame Flags = 1 << iota
-	RTRMsg
-	StatusMsg
+	ExtFrame Flags = 1 << 0 // 29-bit identifier
+	RTRMsg   Flags = 1 << 1 // remote frame (classic CAN only)
 
 	// CAN FD: bits of an FD frame's control field. On transmit,
 	// FDF selects the FD format, which a payload longer than eight
 	// bytes implies. On receive, drivers set FDF for every FD frame.
-	BRS // bit rate switch
-	FDF // FD format
-
-	// if StatusMsg is set:
-	MissingAck
-	ErrorActive
-	ErrorWarning
-	ErrorPassive
-	BusOff
-	DataOverrun
-	ReceiveBufferOverflow
+	BRS Flags = 1 << 3 // bit rate switch
+	FDF Flags = 1 << 4 // FD format
 
 	// ESI is the error state indicator of an FD frame: the sender was
 	// error passive. Drivers report it on receive; it is not sent.
-	// (It follows the status flags, so that existing values, which
-	// canrpc transfers, keep their meaning.)
-	ESI
+	ESI Flags = 1 << 12
 )
 
 // Earlier names of the FD flags.
@@ -54,26 +44,66 @@ const (
 	ForceFD = FDF
 )
 
-// Reports wether the message is a status message, not a data message.
-// In the first case, Msg fields Id, Len and Data should not be interpreted.
-func (f Flags) IsStatus() bool {
-	return f&StatusMsg != 0
-}
-
-// Reports whether the message contains an 29 bit wide, extended identifier,
-// or a standard 11 bit wide identifier.
+// ExtFrame reports whether the frame has a 29-bit extended
+// identifier, rather than an 11-bit standard identifier.
 func (f Flags) ExtFrame() bool {
 	return f&ExtFrame != 0
 }
 
-// Test reports whether all flags in t are set.
-//
-// Deprecated: Use f&t == t, or f&t != 0 for a single flag.
-func (f Flags) Test(t Flags) bool {
-	return (f & t) == t
+// BusState is the fault confinement state of a CAN controller.
+// The states are ordered: a larger value is a worse state.
+type BusState uint8
+
+const (
+	ErrorActive  BusState = iota // normal operation
+	ErrorWarning                 // an error counter reached 96
+	ErrorPassive                 // an error counter reached 128
+	BusOff                       // the transmit error counter exceeded 255
+)
+
+var busStateNames = [...]string{"error-active", "error-warning", "error-passive", "bus-off"}
+
+func (s BusState) String() string {
+	if int(s) < len(busStateNames) {
+		return busStateNames[s]
+	}
+	return "BusState(" + strconv.Itoa(int(s)) + ")"
 }
 
-// A Msg is a CAN frame, or a status message (see [Flags.IsStatus]).
+// Events are conditions reported by a status message.
+type Events uint16
+
+const (
+	NoAck      Events = 1 << iota // a transmitted frame was not acknowledged
+	BusError                      // bit, stuff, form or CRC error
+	RxOverflow                    // received frames were lost
+	TxTimeout                     // a frame could not be sent in time
+	Restarted                     // the controller restarted after bus-off
+)
+
+var eventNames = [...]string{"no-ack", "bus-error", "rx-overflow", "tx-timeout", "restarted"}
+
+func (e Events) String() string {
+	var names []string
+	for i, name := range eventNames {
+		if e&(1<<i) != 0 {
+			names = append(names, name)
+		}
+	}
+	return strings.Join(names, ",")
+}
+
+// Status describes the state of a CAN controller,
+// as reported by a status message.
+type Status struct {
+	State    BusState
+	Events   Events // the conditions that caused the status message
+	TxErr    uint8  // transmit error counter, if Counters
+	RxErr    uint8  // receive error counter, if Counters
+	Counters bool   // TxErr and RxErr are valid
+}
+
+// A Msg is a CAN frame, or a status message (see [Msg.Status]).
 //
 // Payloads of up to eight bytes are stored in the Msg itself,
 // so copying such a Msg copies its payload. Storage for longer
@@ -86,6 +116,9 @@ type Msg struct {
 	n      uint8   // payload length, if stored inline
 	inline [8]byte // classic payload
 	ext    []byte  // payload longer than eight bytes; storage reused
+
+	isStatus bool
+	status   Status
 
 	Rx struct {
 		Time Time // Timestamp
@@ -105,10 +138,12 @@ func (m *Msg) Data() []byte {
 	return m.inline[:m.n]
 }
 
-// SetData sets m's payload to the contents of b. It does not retain b.
+// SetData sets m's payload to the contents of b, making m a frame
+// if it was a status message. It does not retain b.
 // If b is m's own payload storage, as returned by Data and resliced,
 // only the length is updated.
 func (m *Msg) SetData(b []byte) {
+	m.isStatus = false
 	if len(b) <= len(m.inline) {
 		if len(b) > 0 && &b[0] != &m.inline[0] {
 			copy(m.inline[:], b)
@@ -133,6 +168,26 @@ func (m *Msg) Clone() Msg {
 		c.ext = bytes.Clone(m.ext)
 	}
 	return c
+}
+
+// IsStatus reports whether m is a status message rather than a frame.
+// A status message has no identifier, flags or payload.
+func (m *Msg) IsStatus() bool {
+	return m.isStatus
+}
+
+// Status returns the status a status message reports.
+// It reports false if m is a frame.
+func (m *Msg) Status() (Status, bool) {
+	return m.status, m.isStatus
+}
+
+// SetStatus makes m a status message reporting st.
+// It keeps m's payload storage for reuse.
+func (m *Msg) SetStatus(st Status) {
+	m.Reset()
+	m.isStatus = true
+	m.status = st
 }
 
 // Reset sets m back to the zero message. It keeps
@@ -227,6 +282,9 @@ func (m *Msg) FromExpr(expr string) error {
 var dots = strings.NewReplacer(".", "")
 
 func (m *Msg) Format() string {
+	if st, ok := m.Status(); ok {
+		return formatStatus(st)
+	}
 	var sb strings.Builder
 
 	idFormat := "%03X:"
@@ -254,4 +312,17 @@ func (m *Msg) Format() string {
 	x := strings.ToUpper(hex.EncodeToString(data))
 	sb.WriteString(x)
 	return sb.String()
+}
+
+// formatStatus returns a line such as
+// "status: error-passive no-ack (tx 128, rx 0)".
+func formatStatus(st Status) string {
+	s := "status: " + st.State.String()
+	if st.Events != 0 {
+		s += " " + st.Events.String()
+	}
+	if st.Counters {
+		s += fmt.Sprintf(" (tx %d, rx %d)", st.TxErr, st.RxErr)
+	}
+	return s
 }

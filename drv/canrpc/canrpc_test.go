@@ -130,3 +130,30 @@ func TestSuite(t *testing.T) {
 	}
 	cantest.Run(t, open, open, cantest.Options{FD: true})
 }
+
+// TestStatusMsg protects the transfer of status messages, which the
+// suite does not send: between current versions through the Status
+// field, and from earlier servers through their status flags.
+func TestStatusMsg(t *testing.T) {
+	fd := newFakeDev()
+	d := connect(t, fd)
+
+	want := can.Status{State: can.ErrorPassive, Events: can.NoAck, TxErr: 128, Counters: true}
+	var m can.Msg
+	m.SetStatus(want)
+	go func() { fd.c <- m }()
+	got, err := readTimeout(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st, ok := got.Status(); !ok || st != want {
+		t.Errorf("got %+v (status %v), want %+v", st, ok, want)
+	}
+
+	// as sent by a server before v0.6
+	w := WireMsg{Flags: wireStatusMsg | wireBusOff | wireMissingAck}
+	w.decode(&m)
+	if st, ok := m.Status(); !ok || st.State != can.BusOff || st.Events != can.NoAck {
+		t.Errorf("earlier server: got %+v (status %v)", st, ok)
+	}
+}

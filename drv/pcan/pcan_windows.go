@@ -318,21 +318,16 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 			err = io.EOF
 			return
 
-		case st.Test(api.ErrBUSHEAVY | api.ErrBUSOFF):
-			st &= api.ErrBUSHEAVY | api.ErrBUSOFF
+		case st.Test(api.ErrANYBUSERR):
+			st &= api.ErrANYBUSERR
 			if st != prevSt {
-				m := &buf[n]
-				m.Reset() // keeps the payload storage
-				m.Flags = errFlagsMap.Decode(int(st)) | can.StatusMsg
+				buf[n].SetStatus(status(st)) // keeps the payload storage
 				n++
 				prevSt = st
 				return
 			}
 			hasBlocked = false
 			block = true
-
-		case st.Test(api.ErrBUSLIGHT):
-			// ignore
 
 		case st.Test(api.ErrQRCVEMPTY):
 			// It may be possible that at this point the receive queue
@@ -392,6 +387,9 @@ func (d *dev) readMsg(m *can.Msg) error {
 	return d.decode(m, am.ID, am.MSGTYPE, am.Data(), µs)
 }
 
+// errBusPassive is the status bit for an error passive controller.
+const errBusPassive = api.ErrBUSPASSIVE
+
 var msgFlagsMap = drv.FlagsMap{
 	{can.RTRMsg, api.MsgRtr},
 	{can.ExtFrame, api.MsgExtended},
@@ -406,16 +404,15 @@ func (d *dev) decode(dst *can.Msg, id uint32, msgType uint8, apiData []byte, µs
 		d.receive.t0 = can.Now()
 		d.receive.t0val = µs
 	}
-	dst.Rx.Time = d.receive.t0 + can.Time(µs-d.receive.t0val)
+	t := d.receive.t0 + can.Time(µs-d.receive.t0val)
 
 	if msgType&api.MsgStatus != 0 {
 		st := api.Status(binary.BigEndian.Uint32(apiData))
-		dst.Flags = errFlagsMap.Decode(int(st))
-		dst.Flags |= can.StatusMsg
-		dst.Id = 0
-		dst.SetData(nil)
+		dst.SetStatus(status(st))
+		dst.Rx.Time = t
 		return st.Err()
 	}
+	dst.Rx.Time = t
 	dst.Id = id
 	dst.Flags = msgFlagsMap.Decode(int(msgType))
 	dst.SetData(apiData)

@@ -45,21 +45,89 @@ func Register(r Registrar, dev can.Device, name string) error {
 type WireMsg struct {
 	ID uint32
 	can.Flags
-	Data []byte
+	Data   []byte
+	Status *can.Status // set for status messages; earlier versions ignore it
 }
 
+// Status flags of versions before v0.6. Status messages still carry
+// them on the wire, so that earlier clients recognize them, and a
+// client recognizes status messages from an earlier server by them.
+const (
+	wireStatusMsg    can.Flags = 1 << 2
+	wireMissingAck   can.Flags = 1 << 5
+	wireErrorActive  can.Flags = 1 << 6
+	wireErrorWarning can.Flags = 1 << 7
+	wireErrorPassive can.Flags = 1 << 8
+	wireBusOff       can.Flags = 1 << 9
+	wireDataOverrun  can.Flags = 1 << 10
+	wireRxOverflow   can.Flags = 1 << 11
+
+	wireStatusBits = wireStatusMsg | wireMissingAck | wireErrorActive |
+		wireErrorWarning | wireErrorPassive | wireBusOff |
+		wireDataOverrun | wireRxOverflow
+)
+
 func (w *WireMsg) encode(m *can.Msg) {
+	if st, ok := m.Status(); ok {
+		*w = WireMsg{Flags: wireStatusMsg | wireFlags(st), Status: &st}
+		return
+	}
 	w.ID = m.Id
 	// Copy: m's storage is reused by the next Read,
 	// while net/rpc may still be encoding w.
 	w.Data = bytes.Clone(m.Data())
 	w.Flags = m.Flags
+	w.Status = nil
 }
 
 func (w *WireMsg) decode(m *can.Msg) {
-	m.Id = w.ID
-	m.SetData(w.Data)
-	m.Flags = w.Flags
+	switch {
+	case w.Status != nil:
+		m.SetStatus(*w.Status)
+	case w.Flags&wireStatusMsg != 0:
+		m.SetStatus(wireStatus(w.Flags)) // from an earlier server
+	default:
+		m.Id = w.ID
+		m.SetData(w.Data)
+		m.Flags = w.Flags &^ wireStatusBits
+	}
+}
+
+// wireFlags returns the status flags of earlier versions for st.
+func wireFlags(st can.Status) can.Flags {
+	f := [...]can.Flags{
+		can.ErrorActive:  wireErrorActive,
+		can.ErrorWarning: wireErrorWarning,
+		can.ErrorPassive: wireErrorPassive,
+		can.BusOff:       wireBusOff,
+	}[st.State]
+	if st.Events&can.NoAck != 0 {
+		f |= wireMissingAck
+	}
+	if st.Events&can.RxOverflow != 0 {
+		f |= wireRxOverflow
+	}
+	return f
+}
+
+// wireStatus translates the status flags of an earlier server.
+func wireStatus(f can.Flags) can.Status {
+	var st can.Status
+	switch {
+	case f&wireBusOff != 0:
+		st.State = can.BusOff
+	case f&wireErrorPassive != 0:
+		st.State = can.ErrorPassive
+	case f&wireErrorWarning != 0:
+		st.State = can.ErrorWarning
+	}
+	if f&wireMissingAck != 0 {
+		st.Events |= can.NoAck
+	}
+	if f&(wireRxOverflow|wireDataOverrun) != 0 {
+		st.Events |= can.RxOverflow
+	}
+	return st
 }
 
 // Read returns at least one and at most nw messages. After the device

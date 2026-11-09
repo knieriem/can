@@ -97,29 +97,13 @@ func (f *frame) encode(msg *can.Msg, mtu int) (nw int, err error) {
 	return nw, nil
 }
 
-func (f *frame) decode(msg *can.Msg, nRead int) {
+// decode stores the frame in msg. For an error frame, it stores a
+// status message, and keeps state, the last known bus state, current.
+func (f *frame) decode(msg *can.Msg, nRead int, state *can.BusState) {
 	id := f.id()
 	msg.Reset()
 	if id&linux.CAN_ERR_FLAG != 0 {
-		// error frame
-		msg.Flags |= can.StatusMsg
-		ctrlStatus := f.data()[1]
-
-		errClass := id & linux.CAN_ERR_MASK
-		if errClass&linux.CAN_ERR_ACK != 0 {
-			msg.Flags |= can.MissingAck
-		}
-		if errClass&linux.CAN_ERR_BUSOFF != 0 {
-			msg.Flags |= can.BusOff
-		}
-		if errClass&linux.CAN_ERR_CRTL != 0 {
-			if ctrlStatus&linux.CAN_ERR_CRTL_RX_OVERFLOW != 0 {
-				msg.Flags |= can.ReceiveBufferOverflow
-			}
-			if ctrlStatus&linux.CAN_ERR_CRTL_TX_WARNING != 0 {
-				msg.Flags |= can.ErrorWarning
-			}
-		}
+		msg.SetStatus(f.decodeStatus(state))
 		return
 	}
 
@@ -145,6 +129,67 @@ func (f *frame) decode(msg *can.Msg, nRead int) {
 		return
 	}
 	msg.SetData(f.data())
+}
+
+// Values from linux/can/error.h that package linux lacks.
+const (
+	errCrtlActive    = 0x40  // CAN_ERR_CRTL_ACTIVE, in data[1]
+	errProtLocAck    = 0x19  // CAN_ERR_PROT_LOC_ACK, in data[3]
+	errProtLocAckDel = 0x1B  // CAN_ERR_PROT_LOC_ACK_DEL, in data[3]
+	errCnt           = 0x200 // CAN_ERR_CNT: data[6] and data[7] hold the error counters
+)
+
+// decodeStatus translates an error frame. Controllers report a missing
+// acknowledge differently: as CAN_ERR_ACK, or as a protocol error in
+// the ACK slot or delimiter. Both become NoAck.
+func (f *frame) decodeStatus(state *can.BusState) can.Status {
+	id := f.id() & linux.CAN_ERR_MASK
+	d := f.b[dataOffset : dataOffset+8]
+
+	var ev can.Events
+	if id&linux.CAN_ERR_ACK != 0 {
+		ev |= can.NoAck
+	}
+	if id&linux.CAN_ERR_PROT != 0 {
+		if d[3] == errProtLocAck || d[3] == errProtLocAckDel {
+			ev |= can.NoAck
+		} else {
+			ev |= can.BusError
+		}
+	}
+	if id&linux.CAN_ERR_BUSERROR != 0 {
+		ev |= can.BusError
+	}
+	if id&linux.CAN_ERR_TX_TIMEOUT != 0 {
+		ev |= can.TxTimeout
+	}
+	if id&linux.CAN_ERR_CRTL != 0 {
+		c := d[1]
+		if c&linux.CAN_ERR_CRTL_RX_OVERFLOW != 0 {
+			ev |= can.RxOverflow
+		}
+		switch {
+		case c&(linux.CAN_ERR_CRTL_RX_PASSIVE|linux.CAN_ERR_CRTL_TX_PASSIVE) != 0:
+			*state = can.ErrorPassive
+		case c&(linux.CAN_ERR_CRTL_RX_WARNING|linux.CAN_ERR_CRTL_TX_WARNING) != 0:
+			*state = can.ErrorWarning
+		case c&errCrtlActive != 0:
+			*state = can.ErrorActive
+		}
+	}
+	if id&linux.CAN_ERR_BUSOFF != 0 {
+		*state = can.BusOff
+	}
+	if id&linux.CAN_ERR_RESTARTED != 0 {
+		ev |= can.Restarted
+		*state = can.ErrorActive
+	}
+
+	st := can.Status{State: *state, Events: ev}
+	if id&errCnt != 0 {
+		st.TxErr, st.RxErr, st.Counters = d[6], d[7], true
+	}
+	return st
 }
 
 func (f *frame) readFromN(r io.Reader, n int) (int, error) {
