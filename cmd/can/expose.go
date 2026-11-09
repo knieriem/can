@@ -10,11 +10,13 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/rpc"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/knieriem/can"
 	"github.com/knieriem/can/drv/canrpc"
@@ -27,9 +29,14 @@ import (
 var clientID string
 
 var cmdExpose = &tool.Command{
-	UsageLine:    "expose [-id CLIENT_ID] URL [device]",
-	Short:        "expose a CAN device via a yamux based tunnel",
-	Long:         ``,
+	UsageLine: "expose [-id CLIENT_ID] URL [device]",
+	Short:     "expose a CAN device via a yamux based tunnel",
+	Long: `
+Expose connects to a tunnel server at URL and serves the CAN device
+to canrpc clients that the tunnel server forwards. When the tunnel is
+lost, expose connects again, with a growing delay while connections
+keep failing.
+`,
 	ExtraArgsReq: 1,
 	ExtraArgsMax: 2,
 }
@@ -39,28 +46,40 @@ func init() {
 	cmdExpose.Flag.StringVar(&clientID, "id", "", "sent as X-Client-ID")
 }
 
-func runExpose(cmd *tool.Command, w io.Writer, args []string) (err error) {
+func runExpose(cmd *tool.Command, w io.Writer, args []string) error {
 	devName := ""
 	if len(args) > 1 {
 		devName = args[1]
 	}
 	d, err := can.Open(devName)
 	if err != nil {
-		return
+		return err
 	}
-
-	session, err := dialTunnel(args[0], clientID)
-	if err != nil {
+	if err := canrpc.Register(rpc.DefaultServer, d, ""); err != nil {
 		return err
 	}
 
-	err = canrpc.Register(rpc.DefaultServer, d, "")
-	if err != nil {
-		return err
+	// Keep the device reachable: when the tunnel is lost, dial again.
+	// The delay grows while sessions keep failing quickly.
+	const minDelay, maxDelay = time.Second, time.Minute
+	delay := minDelay
+	for {
+		session, err := dialTunnel(args[0], clientID)
+		if err != nil {
+			log.Printf("expose: %v; retrying in %v", err, delay)
+		} else {
+			log.Print("expose: tunnel connected")
+			start := time.Now()
+			rpc.Accept(session) // returns when the session ends
+			session.Close()
+			if time.Since(start) > maxDelay {
+				delay = minDelay
+			}
+			log.Printf("expose: tunnel lost; reconnecting in %v", delay)
+		}
+		time.Sleep(delay)
+		delay = min(2*delay, maxDelay)
 	}
-
-	rpc.Accept(session)
-	return nil
 }
 
 func dialTunnel(rawURL, clientID string) (*yamux.Session, error) {
