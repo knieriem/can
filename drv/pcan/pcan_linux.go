@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"sync/atomic"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -79,6 +80,7 @@ func (*driver) Scan() (list []can.DeviceInfo) {
 type dev struct {
 	file    *os.File
 	rc      syscall.RawConn
+	closed  atomic.Bool
 	info    can.DeviceInfo
 	receive struct {
 		status api.Status
@@ -215,7 +217,7 @@ func (d *dev) Read(buf []can.Msg) (n int, err error) {
 			if err1 == errNoMsg || n > 0 {
 				return n, nil
 			}
-			return 0, closedErr(err1)
+			return 0, d.closedErr(err1)
 		}
 
 		µs := int64(m.DwTime)*1000 + int64(m.WUsec)
@@ -287,19 +289,22 @@ func (d *dev) WriteMsg(cm *can.Msg) (err error) {
 	if errors.Is(err, unix.EAGAIN) {
 		err = can.ErrTxQueueFull
 	}
-	return closedErr(err)
+	return d.closedErr(err)
 }
 
 func (d *dev) Close() (err error) {
-	err = closedErr(d.file.Close())
+	d.closed.Store(true)
+	err = d.closedErr(d.file.Close())
 	wrapErr("close", &err)
 	return
 }
 
-// closedErr translates the error of an operation on a closed file
-// into can.ErrClosed.
-func closedErr(err error) error {
-	if errors.Is(err, os.ErrClosed) {
+// closedErr returns can.ErrClosed if d was closed. A call that Close
+// interrupted fails with an error that depends on the path it took:
+// os.File methods return os.ErrClosed, but syscall.RawConn methods
+// return an internal "use of closed file" error. So rely on the flag.
+func (d *dev) closedErr(err error) error {
+	if d.closed.Load() || errors.Is(err, os.ErrClosed) {
 		return can.ErrClosed
 	}
 	return err

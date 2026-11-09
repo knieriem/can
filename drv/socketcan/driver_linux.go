@@ -92,6 +92,7 @@ type dev struct {
 	}
 	state  can.BusState // last known bus state; used by Read only
 	busOff atomic.Bool  // state is BusOff; read by WriteMsg
+	closed atomic.Bool
 }
 
 func (d *dev) ID() string {
@@ -364,12 +365,15 @@ func setupInfo(info *can.DeviceInfo, link *netlink.Link) {
 }
 
 func (d *dev) Read(buf []can.Msg) (n int, err error) {
+	if d.closed.Load() {
+		return 0, wrapErr("read", can.ErrClosed)
+	}
 	if len(buf) == 0 {
 		return 0, nil
 	}
 	if !d.pending {
 		if err := d.recv(); err != nil {
-			return 0, wrapErr("read", closedErr(err))
+			return 0, wrapErr("read", d.closedErr(err))
 		}
 		if drops, ok := rxqDrops(d.oob[:d.msg.Controllen]); ok && drops != d.drops {
 			// Frames were dropped before this one: report that first.
@@ -464,15 +468,16 @@ func (d *dev) WriteMsg(msg *can.Msg) error {
 		if errors.Is(err, syscall.ENOBUFS) {
 			err = can.ErrTxQueueFull
 		}
-		return wrapErr("write", closedErr(err))
+		return wrapErr("write", d.closedErr(err))
 	}
 	return nil
 }
 
 func (d *dev) Close() error {
+	d.closed.Store(true)
 	err := d.file.Close()
 	if err != nil {
-		return wrapErr("close", closedErr(err))
+		return wrapErr("close", d.closedErr(err))
 	}
 	return nil
 }
@@ -481,10 +486,12 @@ func (d *dev) Info() *can.DeviceInfo {
 	return &d.info
 }
 
-// closedErr translates the error of an operation on a closed file
-// into can.ErrClosed.
-func closedErr(err error) error {
-	if errors.Is(err, os.ErrClosed) {
+// closedErr returns can.ErrClosed if d was closed. A call that Close
+// interrupted fails with an error that depends on the path it took:
+// os.File methods return os.ErrClosed, but syscall.RawConn methods
+// return an internal "use of closed file" error. So rely on the flag.
+func (d *dev) closedErr(err error) error {
+	if d.closed.Load() || errors.Is(err, os.ErrClosed) {
 		return can.ErrClosed
 	}
 	return err
