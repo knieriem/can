@@ -272,7 +272,7 @@ func (d *dev) WriteMsg(cm *can.Msg) (err error) {
 	if cm.IsStatus() {
 		return
 	}
-	if len(cm.Data()) > 8 || cm.Test(can.ForceFD) || cm.Test(can.FDSwitchBitrate) {
+	if len(cm.Data()) > 8 || cm.Flags&(can.FDF|can.BRS) != 0 {
 		return can.ErrInvalidMsgLen
 	}
 	encode(&m, cm)

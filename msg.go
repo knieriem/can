@@ -22,9 +22,11 @@ const (
 	RTRMsg
 	StatusMsg
 
-	// FD specific flags
-	FDSwitchBitrate
-	ForceFD
+	// CAN FD: bits of an FD frame's control field. On transmit,
+	// FDF selects the FD format, which a payload longer than eight
+	// bytes implies. On receive, drivers set FDF for every FD frame.
+	BRS // bit rate switch
+	FDF // FD format
 
 	// if StatusMsg is set:
 	MissingAck
@@ -34,6 +36,22 @@ const (
 	BusOff
 	DataOverrun
 	ReceiveBufferOverflow
+
+	// ESI is the error state indicator of an FD frame: the sender was
+	// error passive. Drivers report it on receive; it is not sent.
+	// (It follows the status flags, so that existing values, which
+	// canrpc transfers, keep their meaning.)
+	ESI
+)
+
+// Earlier names of the FD flags.
+const (
+	// Deprecated: Use BRS.
+	FDSwitchBitrate = BRS
+
+	// Deprecated: Use FDF. Note that drivers set FDF on every
+	// received FD frame, not only on frames of up to eight bytes.
+	ForceFD = FDF
 )
 
 // Reports wether the message is a status message, not a data message.
@@ -48,6 +66,9 @@ func (f Flags) ExtFrame() bool {
 	return f&ExtFrame != 0
 }
 
+// Test reports whether all flags in t are set.
+//
+// Deprecated: Use f&t == t, or f&t != 0 for a single flag.
 func (f Flags) Test(t Flags) bool {
 	return (f & t) == t
 }
@@ -172,7 +193,7 @@ func (m *Msg) FromExpr(expr string) error {
 			return nil
 		}
 		if expr[0] == sep {
-			m.Flags |= ForceFD
+			m.Flags |= FDF
 			expr = expr[1:]
 			if expr == "" {
 				return errors.New("CAN FD flags value missing")
@@ -182,8 +203,12 @@ func (m *Msg) FromExpr(expr string) error {
 				return err
 			}
 			if u&1 != 0 {
-				m.Flags |= FDSwitchBitrate
+				m.Flags |= BRS
 			}
+			if u&2 != 0 {
+				m.Flags |= ESI
+			}
+			// Bit 4 (FDF) is implied by the separator.
 			expr = expr[1:]
 		}
 		if expr == "R" {
@@ -213,16 +238,18 @@ func (m *Msg) Format() string {
 		sb.WriteByte('R')
 		return sb.String()
 	}
-	fdFlags := 0
-	if m.Flags&FDSwitchBitrate != 0 {
-		fdFlags = 1
-	}
+	// As in can-utils' cansend, a doubled separator marks an FD frame,
+	// followed by a digit with BRS (1) and ESI (2).
 	data := m.Data()
-	if m.Flags&ForceFD != 0 && len(data) <= 8 {
-		fdFlags |= 4
-	}
-	if fdFlags != 0 || len(data) > 8 {
-		fmt.Fprintf(&sb, ":%X", fdFlags)
+	if m.Flags&(FDF|BRS) != 0 || len(data) > 8 {
+		fd := 0
+		if m.Flags&BRS != 0 {
+			fd |= 1
+		}
+		if m.Flags&ESI != 0 {
+			fd |= 2
+		}
+		fmt.Fprintf(&sb, ":%X", fd)
 	}
 	x := strings.ToUpper(hex.EncodeToString(data))
 	sb.WriteString(x)

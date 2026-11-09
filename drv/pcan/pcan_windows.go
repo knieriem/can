@@ -395,8 +395,9 @@ func (d *dev) readMsg(m *can.Msg) error {
 var msgFlagsMap = drv.FlagsMap{
 	{can.RTRMsg, api.MsgRtr},
 	{can.ExtFrame, api.MsgExtended},
-	{can.FDSwitchBitrate, api.MsgBrs},
-	{can.ForceFD, api.MsgFd},
+	{can.BRS, api.MsgBrs},
+	{can.FDF, api.MsgFd},
+	{can.ESI, api.MsgEsi},
 }
 
 func (d *dev) decode(dst *can.Msg, id uint32, msgType uint8, apiData []byte, µs int64) error {
@@ -461,8 +462,8 @@ func encodeFD(dst *api.MsgFD, src *can.Msg) error {
 		return err
 	}
 	dst.DLC = dlc
-	dst.MSGTYPE = byte(msgFlagsMap.Encode(src.Flags))
-	if needsFD {
+	dst.MSGTYPE = byte(msgFlagsMap.Encode(src.Flags &^ can.ESI)) // ESI is not sent
+	if needsFD || dst.MSGTYPE&api.MsgBrs != 0 {
 		dst.MSGTYPE |= api.MsgFd
 	}
 	copy(dst.DATA[:], data)

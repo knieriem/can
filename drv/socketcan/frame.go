@@ -76,7 +76,7 @@ func (f *frame) encode(msg *can.Msg, mtu int) (nw int, err error) {
 	copy(f.data(), data)
 
 	id := msg.Id
-	if msg.Test(can.RTRMsg) {
+	if msg.Flags&can.RTRMsg != 0 {
 		if n != 0 {
 			return 0, can.ErrInvalidMsgLen
 		}
@@ -87,11 +87,11 @@ func (f *frame) encode(msg *can.Msg, mtu int) (nw int, err error) {
 	}
 	f.setid(id)
 
-	if msg.Flags.Test(can.FDSwitchBitrate) {
+	if msg.Flags&can.BRS != 0 {
 		f.setFlags(linux.CANFD_BRS)
 		needsFD = true
 	}
-	if needsFD || msg.Test(can.ForceFD) {
+	if needsFD || msg.Flags&can.FDF != 0 {
 		nw = len(f.b)
 	}
 	return nw, nil
@@ -133,11 +133,12 @@ func (f *frame) decode(msg *can.Msg, nRead int) {
 	flags := f.flags()
 
 	if isFD := nRead == linux.CANFD_MTU || flags&linux.CANFD_FDF != 0; isFD {
+		msg.Flags |= can.FDF
 		if flags&linux.CANFD_BRS != 0 {
-			msg.Flags |= can.FDSwitchBitrate
+			msg.Flags |= can.BRS
 		}
-		if f.len() <= 8 {
-			msg.Flags |= can.ForceFD
+		if flags&linux.CANFD_ESI != 0 {
+			msg.Flags |= can.ESI
 		}
 	} else if id&linux.CAN_RTR_FLAG != 0 {
 		msg.Flags |= can.RTRMsg

@@ -294,14 +294,10 @@ func (r *reader) next(timeout time.Duration) (can.Msg, error) {
 	}
 }
 
-// flags returns the flags relevant for comparing data messages.
-// ForceFD is implied by a payload longer than eight bytes.
+// flags returns the flags that describe a data frame's format.
+// ESI is left out: it depends on the sender's error state.
 func flags(m *can.Msg) can.Flags {
-	f := m.Flags & (can.ExtFrame | can.RTRMsg | can.FDSwitchBitrate | can.ForceFD)
-	if len(m.Data()) > 8 {
-		f &^= can.ForceFD
-	}
-	return f
+	return m.Flags & (can.ExtFrame | can.RTRMsg | can.FDF | can.BRS)
 }
 
 func equal(a, b *can.Msg) bool {

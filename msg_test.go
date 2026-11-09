@@ -127,6 +127,9 @@ func TestFormat(t *testing.T) {
 		"18DAF105:11",
 		"123:R",
 		"18DAF105:R",
+		"123::0AABB",
+		"123::1AABB",
+		"18DAF105::1" + "000102030405060708090A0B",
 	} {
 		var m Msg
 		if err := m.FromExpr(expr); err != nil {
