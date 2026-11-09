@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -279,14 +280,32 @@ func setupSocket(dev string) (int, error) {
 // At 500 kbit/s it holds roughly a second of frames.
 const rcvBufSize = 1 << 20
 
-// setRcvBuf enlarges the socket receive buffer. Without CAP_NET_ADMIN,
-// the kernel caps the size at net.core.rmem_max. Errors are ignored:
-// a smaller buffer still works.
+// setRcvBuf enlarges the socket receive buffer to rcvBufSize, but
+// never shrinks it, as a system may have a larger rmem_default.
+// Errors are ignored: the default buffer still works.
 func setRcvBuf(fd int) {
+	cur, err := unix.GetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUF)
+	if err != nil || cur >= rcvBufSize {
+		return
+	}
 	if unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUFFORCE, rcvBufSize) == nil {
 		return
 	}
+	// Without CAP_NET_ADMIN, the kernel caps the request at rmem_max,
+	// and doubles it. Request it only if the result is larger.
+	max, err := rmemMax()
+	if err != nil || 2*min(rcvBufSize, max) <= cur {
+		return
+	}
 	_ = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUF, rcvBufSize)
+}
+
+func rmemMax() (int, error) {
+	b, err := os.ReadFile("/proc/sys/net/core/rmem_max")
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(strings.TrimSpace(string(b)))
 }
 
 // pollableFile turns fd into an *os.File, that is managed by Go's runtime poller

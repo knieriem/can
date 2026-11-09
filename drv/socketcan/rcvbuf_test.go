@@ -9,6 +9,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// TestRcvBuf protects setRcvBuf: it must never shrink the default
+// buffer, and as root it must reach rcvBufSize. It also logs the size
+// the kernel granted, which helps to diagnose dropped frames.
 func TestRcvBuf(t *testing.T) {
 	fd, err := unix.Socket(unix.AF_CAN, unix.SOCK_RAW, unix.CAN_RAW)
 	if err != nil {
@@ -16,13 +19,20 @@ func TestRcvBuf(t *testing.T) {
 	}
 	defer unix.Close(fd)
 
-	setRcvBuf(fd)
-	n, err := unix.GetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUF)
+	before, err := unix.GetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUF)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("rcvbuf: %d bytes", n) // the kernel reports twice the requested size
-	if os.Geteuid() == 0 && n < rcvBufSize {
-		t.Errorf("privileged: rcvbuf %d, want at least %d", n, rcvBufSize)
+	setRcvBuf(fd)
+	after, err := unix.GetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUF)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("rcvbuf: %d bytes, default %d", after, before)
+	if after < before {
+		t.Errorf("rcvbuf shrank from %d to %d", before, after)
+	}
+	if os.Geteuid() == 0 && after < rcvBufSize {
+		t.Errorf("as root: rcvbuf %d, want at least %d", after, rcvBufSize)
 	}
 }
