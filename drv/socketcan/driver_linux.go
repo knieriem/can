@@ -24,12 +24,19 @@ import (
 	"github.com/knieriem/can/drv/socketcan/internal/netlink"
 )
 
+// Driver is the default socketcan driver. When the config asks for a
+// change of interface settings, such as a bit rate, it starts the
+// socketcan-link helper, found in PATH, which needs CAP_NET_ADMIN
+// (setcap cap_net_admin+ep). Settings that already match need no helper.
 var Driver = defaultDriver
 
 var defaultDriver = can.Driver(&driver{
 	privilegedCmd: "socketcan-link",
 })
 
+// NewDriver returns a socketcan driver configured only by opts.
+// Without WithPrivilegedUtil, it changes interface settings directly,
+// which needs CAP_NET_ADMIN. Driver, the default, uses the helper.
 func NewDriver(opts ...DriverOption) can.Driver {
 	drv := new(driver)
 	for _, o := range opts {
@@ -38,8 +45,11 @@ func NewDriver(opts ...DriverOption) can.Driver {
 	return drv
 }
 
+// A DriverOption configures a driver made by NewDriver.
 type DriverOption func(*driver)
 
+// WithPrivilegedUtil makes the driver change interface settings
+// through the socketcan-link helper, as Driver does.
 func WithPrivilegedUtil() DriverOption {
 	return func(d *driver) {
 		d.privilegedCmd = "socketcan-link"
@@ -173,7 +183,8 @@ func (drv *driver) Open(devName string, conf *can.Config) (can.Device, error) {
 			if drv.privilegedCmd != "" {
 				priv, err = startPrivilegedUtil(drv.privilegedCmd, link.Name)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("socketcan: changing the settings of %s needs %s (setcap cap_net_admin+ep) or CAP_NET_ADMIN: %w",
+						link.Name, drv.privilegedCmd, err)
 				}
 				defer func() {
 					if cleanupPriv != nil {

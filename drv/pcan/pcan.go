@@ -35,9 +35,15 @@ var builtinBitrates = map[uint32]uint16{
 	5000:    api.Baud5K,
 }
 
+// Driver is the pcan driver. Register it with can.RegisterDriver,
+// or use package drv/all.
+var Driver can.Driver = new(driver)
+
+// For compatibility, importing the package registers Driver,
+// if the system driver is present. A future version will not.
 func init() {
 	if driverPresent() {
-		can.RegisterDriver(new(driver))
+		can.RegisterDriver(Driver)
 	}
 }
 

@@ -3,10 +3,11 @@ package main
 import (
 	"github.com/knieriem/tool"
 
-	_ "github.com/knieriem/can/drv/all"
+	"github.com/knieriem/can/drv/all"
 )
 
 func main() {
+	all.Register()
 	tool.Name = "can"
 	tool.Title = "CAN utility."
 	tool.Version = "0.1"

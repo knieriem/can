@@ -1,20 +1,31 @@
 // Package all registers all drivers of this module that are available
 // on the platform, so that a program picks up new drivers by updating
-// the module. Import it for its side effect:
+// the module:
 //
-//	import _ "github.com/knieriem/can/drv/all"
+//	all.Register()
 //
-// To use a driver with other options, register it after importing all;
-// it replaces the default driver of the same name.
+// To use a driver with other options, register it after calling
+// Register; it replaces the default driver of the same name.
+//
+// For compatibility, importing the package also registers the
+// drivers; a future version will not.
 package all
 
 import (
 	"github.com/knieriem/can"
-	_ "github.com/knieriem/can/drv/canrpc"
-	_ "github.com/knieriem/can/drv/pcan"
+	"github.com/knieriem/can/drv/canrpc"
+	"github.com/knieriem/can/drv/pcan"
 	"github.com/knieriem/can/drv/socketcan"
 )
 
-func init() {
+// Register registers all drivers of this module that are available
+// on the platform.
+func Register() {
+	can.RegisterDriver(canrpc.Driver)
+	can.RegisterDriver(pcan.Driver)
 	can.RegisterDriver(socketcan.Driver)
+}
+
+func init() {
+	Register()
 }

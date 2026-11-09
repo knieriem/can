@@ -6,7 +6,7 @@
 //
 // On the server side, Register adds a device to an rpc.Server. On the
 // client side, can.Open with the driver name "rpc" connects to a
-// server. If, for example, a server runs on host 192.168.1.2, port 6000:
+// server, once Driver is registered. If, for example, a server runs on host 192.168.1.2, port 6000:
 //
 //	rpc:192.168.1.2:6000
 //
@@ -30,7 +30,8 @@
 // make a server reachable only through a secure channel, such as an
 // SSH tunnel.
 //
-// The package registers its driver with the can package when imported.
+// For compatibility, importing the package registers Driver with the
+// can package; a future version will not.
 package canrpc
 
 import (
@@ -126,8 +127,14 @@ func NewDevice(c Caller, name string) can.Device {
 	return newDevice(c, name)
 }
 
+// Driver is the canrpc client driver, named "rpc". Register it with
+// can.RegisterDriver, or use package drv/all.
+var Driver can.Driver = new(driver)
+
+// For compatibility, importing the package registers Driver.
+// A future version will not.
 func init() {
-	can.RegisterDriver(new(driver))
+	can.RegisterDriver(Driver)
 }
 
 type driver struct{}

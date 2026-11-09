@@ -1,5 +1,7 @@
 // Package pcan implements a [github.com/knieriem/can.Driver]
-// for PEAK-System PCAN adapters.
+// for PEAK-System PCAN adapters. Register [Driver] with
+// can.RegisterDriver, or use package drv/all. For compatibility,
+// importing the package still registers it; a future version will not.
 //
 // On Windows, it uses the PCAN-Basic library (PCANBasic.dll),
 // which must be installed. CAN FD is supported.

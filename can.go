@@ -129,6 +129,9 @@ func WithConfig(conf *Config) Option {
 // Read delivers no status messages, unless WithStatusMsgs or
 // WithBusErrors is given.
 func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
+	if len(drvlist) == 0 {
+		return nil, Error("no drivers registered; call RegisterDriver, or Register in package drv/all")
+	}
 	var p openProps
 
 	for _, o := range opts {

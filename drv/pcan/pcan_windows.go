@@ -26,7 +26,9 @@ import (
 	"github.com/knieriem/can/timing"
 )
 
-func driverPresent() bool {
+// driverPresent reports whether PCANBasic.dll can be found. Without it,
+// the generated API functions would panic, so Scan and Open check it.
+var driverPresent = sync.OnceValue(func() bool {
 	_, err := exec.LookPath("PCANBasic.dll")
 	if err != nil {
 		if errors.Is(err, exec.ErrDot) {
@@ -34,7 +36,7 @@ func driverPresent() bool {
 		}
 	}
 	return err == nil
-}
+})
 
 type bus struct {
 	name     string
@@ -126,6 +128,9 @@ type dev struct {
 }
 
 func (*driver) Scan() (list []can.DeviceInfo) {
+	if !driverPresent() {
+		return nil
+	}
 	d := api.AttachedDevices()
 	for i := range d {
 		ch := &d[i]
@@ -147,6 +152,9 @@ func (*driver) Scan() (list []can.DeviceInfo) {
 }
 
 func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error) {
+	if !driverPresent() {
+		return nil, errors.New("pcan: PCANBasic.dll not found")
+	}
 	defer wrapErr("open", &err)
 	d := new(dev)
 
