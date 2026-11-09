@@ -131,7 +131,8 @@ func dialHTTP(u *url.URL, clientID string) (net.Conn, error) {
 		return nil, fmt.Errorf("failed to write request: %w", err)
 	}
 
-	resp, err := http.ReadResponse(bufio.NewReader(conn), req)
+	br := bufio.NewReader(conn)
+	resp, err := http.ReadResponse(br, req)
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("failed to read response: %w", err)
@@ -142,7 +143,18 @@ func dialHTTP(u *url.URL, clientID string) (net.Conn, error) {
 		conn.Close()
 		return nil, fmt.Errorf("tunnel rejected by server: HTTP status %d", resp.StatusCode)
 	}
-	return conn, nil
+	return &bufferedConn{Conn: conn, r: br}, nil
+}
+
+// bufferedConn reads through r, which may already hold the first
+// tunnel bytes, received together with the HTTP response.
+type bufferedConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (c *bufferedConn) Read(p []byte) (int, error) {
+	return c.r.Read(p)
 }
 
 func dialWebSocket(tunnelURL, clientID string) (net.Conn, error) {
