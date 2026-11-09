@@ -270,9 +270,13 @@ skipConfig:
 		}
 	}
 
+	// Error classes decodeStatus understands. CAN_ERR_PROT is needed
+	// too: some controllers report a missing ACK only as a protocol
+	// error in the ACK slot.
 	errMask := linux.CAN_ERR_CRTL |
 		linux.CAN_ERR_BUSOFF |
 		linux.CAN_ERR_ACK |
+		linux.CAN_ERR_PROT |
 		linux.CAN_ERR_BUSERROR |
 		linux.CAN_ERR_RESTARTED |
 		linux.CAN_ERR_TX_TIMEOUT
