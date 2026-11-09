@@ -6,7 +6,9 @@ package canrpc
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"time"
 
 	"github.com/knieriem/can"
 )
@@ -159,13 +161,13 @@ func (o *object) Read(nw int, r *[]WireMsg) error {
 	return nil
 }
 
-// Write serves clients of earlier versions, which send messages in
-// batches. It stops at the first error.
+// Write sends the messages of a batch in order, and stops at the first
+// error. Clients send all messages with Write.
 func (o *object) Write(w []WireMsg, n *int) error {
 	var m can.Msg
 	for i := range w {
 		w[i].decode(&m)
-		if err := o.dev.WriteMsg(&m); err != nil {
+		if err := o.writeMsg(&m); err != nil {
 			*n = i
 			return err
 		}
@@ -174,6 +176,21 @@ func (o *object) Write(w []WireMsg, n *int) error {
 	return nil
 }
 
+// writeMsg waits out a full transmit queue for up to a second, as the
+// client cannot retry a single message from the middle of a batch.
+func (o *object) writeMsg(m *can.Msg) error {
+	deadline := time.Now().Add(time.Second)
+	for {
+		err := o.dev.WriteMsg(m)
+		if !errors.Is(err, can.ErrTxQueueFull) || time.Now().After(deadline) {
+			return err
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+// WriteMsg serves clients of earlier versions,
+// which sent one message per call.
 func (o *object) WriteMsg(w *WireMsg, _ *int) (err error) {
 	var m can.Msg
 

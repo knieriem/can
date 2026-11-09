@@ -15,9 +15,10 @@ import (
 // fakeDev delivers messages sent on c; Read fails with the
 // first error sent on errc, and with every later call.
 type fakeDev struct {
-	c    chan can.Msg
-	errc chan error
-	err  error
+	c        chan can.Msg
+	errc     chan error
+	err      error
+	writeErr error // returned by WriteMsg
 	can.Unversioned
 }
 
@@ -38,7 +39,7 @@ func (d *fakeDev) Read(buf []can.Msg) (int, error) {
 	}
 }
 
-func (d *fakeDev) WriteMsg(*can.Msg) error { return nil }
+func (d *fakeDev) WriteMsg(*can.Msg) error { return d.writeErr }
 func (d *fakeDev) ID() string              { return "fake" }
 func (d *fakeDev) Close() error            { return nil }
 
@@ -155,5 +156,20 @@ func TestStatusMsg(t *testing.T) {
 	w.decode(&m)
 	if st, ok := m.Status(); !ok || st.State != can.BusOff || st.Events != can.NoAck {
 		t.Errorf("earlier server: got %+v (status %v)", st, ok)
+	}
+}
+
+// TestWriteErrorReported protects that an error of the remote device,
+// which arrives after WriteMsg returned, is not lost: Close reports it.
+func TestWriteErrorReported(t *testing.T) {
+	fd := newFakeDev()
+	fd.writeErr = fmt.Errorf("socketcan: write: %w", can.ErrTxQueueFull)
+	d := connect(t, fd)
+
+	if err := d.WriteMsg(new(can.Msg)); err != nil {
+		t.Fatalf("first WriteMsg: %v", err)
+	}
+	if err := d.Close(); !errors.Is(err, can.ErrTxQueueFull) {
+		t.Errorf("Close: %v, want ErrTxQueueFull", err)
 	}
 }

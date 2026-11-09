@@ -49,13 +49,28 @@ type device struct {
 	cl     sync.Mutex
 	closed atomic.Bool
 	can.Unversioned
+
+	// WriteMsg queues messages; flush sends them with one Write call
+	// at a time, which keeps their order. The server runs concurrent
+	// calls in separate goroutines, so it would not.
+	wmu      sync.Mutex
+	flushed  sync.Cond // signaled when flush ends
+	pending  []WireMsg
+	flushing bool
+	werr     error // error of an earlier Write call, reported once
+}
+
+// maxPending limits the messages queued by WriteMsg.
+const maxPending = 1024
+
+func newDevice(c Caller, path string) *device {
+	d := &device{Caller: c, path: path}
+	d.flushed.L = &d.wmu
+	return d
 }
 
 func NewDevice(c Caller, name string) can.Device {
-	d := new(device)
-	d.Caller = c
-	d.path = name
-	return d
+	return newDevice(c, name)
 }
 
 func init() {
@@ -74,18 +89,17 @@ func (*driver) Scan() (list []can.DeviceInfo) {
 
 func (*driver) Open(addr string, _ *can.Config) (cd can.Device, err error) {
 
-	d := new(device)
-
 	// split the optional path part from addr
+	path := ""
 	if i := strings.Index(addr, "/"); i != -1 {
-		addr, d.path = addr[:i], addr[i+1:]
+		addr, path = addr[:i], addr[i+1:]
 	}
 
 	cl, err := rpc.Dial("tcp", addr)
 	if err != nil {
 		return
 	}
-	d.Caller = cl
+	d := newDevice(cl, path)
 	d.Closer = cl
 	cd = d
 	return
@@ -115,24 +129,74 @@ func (d *device) Read(buf []can.Msg) (n int, err error) {
 	return len(r), nil
 }
 
+// WriteMsg queues m and returns. A Write call sends the queued messages
+// in the background, so that writing is not limited to one message per
+// round trip. An error of the remote device is returned by a later
+// WriteMsg, or by Close, which waits until all messages are sent.
 func (d *device) WriteMsg(m *can.Msg) error {
 	if d.closed.Load() {
 		return wrapErr("write", can.ErrClosed)
 	}
 	var w WireMsg
 	w.encode(m)
-	if err := d.call("WriteMsg", w, nil); err != nil {
+
+	d.wmu.Lock()
+	defer d.wmu.Unlock()
+	if err := d.werr; err != nil {
+		d.werr = nil
 		return wrapErr("write", err)
 	}
+	if len(d.pending) >= maxPending {
+		return wrapErr("write", can.ErrTxQueueFull)
+	}
+	d.pending = append(d.pending, w)
+	if !d.flushing {
+		d.flushing = true
+		go d.flush()
+	}
 	return nil
+}
+
+// flush sends the queued messages, one Write call at a time,
+// until none are left or a call fails.
+func (d *device) flush() {
+	d.wmu.Lock()
+	defer d.wmu.Unlock()
+	for len(d.pending) > 0 {
+		batch := d.pending
+		d.pending = nil
+		d.wmu.Unlock()
+		var n int
+		err := d.call("Write", batch, &n)
+		d.wmu.Lock()
+		if err != nil {
+			d.werr = err
+			d.pending = nil // keep the order: drop what follows a failure
+			break
+		}
+	}
+	d.flushing = false
+	d.flushed.Broadcast()
 }
 
 func (d *device) Close() error {
 	if d.closed.Swap(true) {
 		return wrapErr("close", can.ErrClosed)
 	}
+
+	// Wait until queued messages are sent.
+	d.wmu.Lock()
+	for d.flushing {
+		d.flushed.Wait()
+	}
+	werr := d.werr
+	d.wmu.Unlock()
+
 	// Unblock a pending Read on the server side.
 	err := d.call("Close", 0, nil)
+	if err == nil {
+		err = werr
+	}
 
 	if d.Closer != nil {
 		// Wait until the last Read call returned before closing
