@@ -3,6 +3,7 @@ package canrpc
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/rpc"
 	"testing"
@@ -171,5 +172,23 @@ func TestWriteErrorReported(t *testing.T) {
 	}
 	if err := d.Close(); !errors.Is(err, can.ErrTxQueueFull) {
 		t.Errorf("Close: %v, want ErrTxQueueFull", err)
+	}
+}
+
+// TestConnLost protects the watchdog: when the server stops replying,
+// as through a broken tunnel, a blocked Read returns ErrConnLost.
+func TestConnLost(t *testing.T) {
+	defer func(i, to time.Duration) { pingInterval, pingTimeout = i, to }(pingInterval, pingTimeout)
+	pingInterval, pingTimeout = 20*time.Millisecond, 50*time.Millisecond
+
+	c1, c2 := net.Pipe()
+	go io.Copy(io.Discard, c1) // a peer that reads, but never replies
+	cl := rpc.NewClient(c2)
+	d := newDevice(cl, "")
+	d.Closer = cl
+	go d.watch()
+
+	if _, err := readTimeout(d); !errors.Is(err, ErrConnLost) {
+		t.Errorf("Read: %v, want ErrConnLost", err)
 	}
 }

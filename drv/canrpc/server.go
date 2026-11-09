@@ -199,6 +199,11 @@ func (o *object) WriteMsg(w *WireMsg, _ *int) (err error) {
 	return
 }
 
+// Ping lets clients check that the server still replies.
+func (o *object) Ping(_ int, _ *int) error {
+	return nil
+}
+
 func (o *object) Close(_ int, _ *int) (err error) {
 	select {
 	case o.unblockch <- true:

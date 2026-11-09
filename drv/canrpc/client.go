@@ -29,6 +29,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/knieriem/can"
 )
@@ -48,6 +49,7 @@ type device struct {
 	path   string
 	cl     sync.Mutex
 	closed atomic.Bool
+	lost   atomic.Bool // the server did not reply to a ping in time
 	can.Unversioned
 
 	// WriteMsg queues messages; flush sends them with one Write call
@@ -58,6 +60,43 @@ type device struct {
 	pending  []WireMsg
 	flushing bool
 	werr     error // error of an earlier Write call, reported once
+}
+
+// ErrConnLost is returned, wrapped, after the server stopped replying,
+// for example because a tunnel to it broke.
+var ErrConnLost = errors.New("connection lost")
+
+// The interval and timeout of pings; variables, so that tests can
+// shorten them.
+var (
+	pingInterval = 10 * time.Second
+	pingTimeout  = 30 * time.Second
+)
+
+// watch pings the server regularly and closes the connection when a
+// ping gets no reply in time, so that a broken link, which TCP through
+// a tunnel may not notice, does not block Read forever. Any reply
+// counts, even the error of an earlier server without Ping.
+func (d *device) watch() {
+	t := time.NewTicker(pingInterval)
+	defer t.Stop()
+	for range t.C {
+		if d.closed.Load() {
+			return
+		}
+		replied := make(chan struct{})
+		go func() {
+			d.call("Ping", 0, nil)
+			close(replied)
+		}()
+		select {
+		case <-replied:
+		case <-time.After(pingTimeout):
+			d.lost.Store(true)
+			d.Closer.Close()
+			return
+		}
+	}
 }
 
 // maxPending limits the messages queued by WriteMsg.
@@ -101,6 +140,7 @@ func (*driver) Open(addr string, _ *can.Config) (cd can.Device, err error) {
 	}
 	d := newDevice(cl, path)
 	d.Closer = cl
+	go d.watch()
 	cd = d
 	return
 }
@@ -111,7 +151,7 @@ func (d *device) ID() string {
 
 func (d *device) Read(buf []can.Msg) (n int, err error) {
 	if d.closed.Load() {
-		return 0, wrapErr("read", can.ErrClosed)
+		return 0, d.wrapErr("read", can.ErrClosed)
 	}
 	var r []WireMsg
 	d.cl.Lock()
@@ -121,7 +161,7 @@ func (d *device) Read(buf []can.Msg) (n int, err error) {
 		if d.closed.Load() {
 			err = can.ErrClosed
 		}
-		return 0, wrapErr("read", err)
+		return 0, d.wrapErr("read", err)
 	}
 	for i := range r {
 		r[i].decode(&buf[i])
@@ -135,7 +175,7 @@ func (d *device) Read(buf []can.Msg) (n int, err error) {
 // WriteMsg, or by Close, which waits until all messages are sent.
 func (d *device) WriteMsg(m *can.Msg) error {
 	if d.closed.Load() {
-		return wrapErr("write", can.ErrClosed)
+		return d.wrapErr("write", can.ErrClosed)
 	}
 	var w WireMsg
 	w.encode(m)
@@ -144,10 +184,10 @@ func (d *device) WriteMsg(m *can.Msg) error {
 	defer d.wmu.Unlock()
 	if err := d.werr; err != nil {
 		d.werr = nil
-		return wrapErr("write", err)
+		return d.wrapErr("write", err)
 	}
 	if len(d.pending) >= maxPending {
-		return wrapErr("write", can.ErrTxQueueFull)
+		return d.wrapErr("write", can.ErrTxQueueFull)
 	}
 	d.pending = append(d.pending, w)
 	if !d.flushing {
@@ -181,7 +221,7 @@ func (d *device) flush() {
 
 func (d *device) Close() error {
 	if d.closed.Swap(true) {
-		return wrapErr("close", can.ErrClosed)
+		return d.wrapErr("close", can.ErrClosed)
 	}
 
 	// Wait until queued messages are sent.
@@ -206,16 +246,18 @@ func (d *device) Close() error {
 		d.cl.Unlock()
 	}
 	if err != nil {
-		return wrapErr("close", err)
+		return d.wrapErr("close", err)
 	}
 	return nil
 }
 
 // wrapErr adds context to err. As net/rpc transports server errors as
 // strings only, it recognizes ErrClosed and ErrTxQueueFull by their text.
-func wrapErr(op string, err error) error {
+func (d *device) wrapErr(op string, err error) error {
 	var se rpc.ServerError
 	switch {
+	case d.lost.Load() && !errors.Is(err, can.ErrClosed):
+		err = ErrConnLost
 	case errors.Is(err, rpc.ErrShutdown):
 		err = can.ErrClosed
 	case errors.As(err, &se):
