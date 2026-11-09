@@ -60,10 +60,6 @@ type Device interface {
 	// [ErrTxQueueFull]; the caller decides whether to retry.
 	WriteMsg(m *Msg) error
 
-	// Write calls WriteMsg for each message, and stops
-	// at the first error.
-	Write(msgs []Msg) (n int, err error)
-
 	ID() string
 	Info() *DeviceInfo
 

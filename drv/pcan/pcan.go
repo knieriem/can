@@ -126,17 +126,6 @@ func (buses busList) lookupName(name string) (b *bus, i int, err error) {
 	return
 }
 
-func (d *dev) Write(msgs []can.Msg) (n int, err error) {
-	for i := range msgs {
-		err = d.WriteMsg(&msgs[i])
-		if err != nil {
-			break
-		}
-		n++
-	}
-	return
-}
-
 var errFlagsMap = drv.FlagsMap{
 	{can.ErrorActive, int(api.ErrBUSLIGHT)},
 	{can.ErrorPassive, int(api.ErrBUSHEAVY)},

@@ -359,17 +359,6 @@ func (d *dev) WriteMsg(msg *can.Msg) error {
 	return nil
 }
 
-func (d *dev) Write(msgs []can.Msg) (n int, err error) {
-	for i := range msgs {
-		err = d.WriteMsg(&msgs[i])
-		if err != nil {
-			break
-		}
-		n++
-	}
-	return
-}
-
 func (d *dev) Close() error {
 	err := d.file.Close()
 	if err != nil {

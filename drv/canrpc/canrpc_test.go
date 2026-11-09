@@ -38,10 +38,9 @@ func (d *fakeDev) Read(buf []can.Msg) (int, error) {
 	}
 }
 
-func (d *fakeDev) WriteMsg(*can.Msg) error        { return nil }
-func (d *fakeDev) Write(m []can.Msg) (int, error) { return len(m), nil }
-func (d *fakeDev) ID() string                     { return "fake" }
-func (d *fakeDev) Close() error                   { return nil }
+func (d *fakeDev) WriteMsg(*can.Msg) error { return nil }
+func (d *fakeDev) ID() string              { return "fake" }
+func (d *fakeDev) Close() error            { return nil }
 
 // connect registers dev with an RPC server and returns a client device.
 func connect(t *testing.T, dev can.Device) can.Device {

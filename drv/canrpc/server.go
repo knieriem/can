@@ -91,14 +91,19 @@ func (o *object) Read(nw int, r *[]WireMsg) error {
 	return nil
 }
 
-func (o *object) Write(w []WireMsg, n *int) (err error) {
-	//	fmt.Fprint(os.Stderr, "w")
-	m := make([]can.Msg, len(w))
+// Write serves clients of earlier versions, which send messages in
+// batches. It stops at the first error.
+func (o *object) Write(w []WireMsg, n *int) error {
+	var m can.Msg
 	for i := range w {
-		w[i].decode(&m[i])
+		w[i].decode(&m)
+		if err := o.dev.WriteMsg(&m); err != nil {
+			*n = i
+			return err
+		}
 	}
-	*n, err = o.dev.Write(m)
-	return
+	*n = len(w)
+	return nil
 }
 
 func (o *object) WriteMsg(w *WireMsg, _ *int) (err error) {

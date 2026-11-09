@@ -115,16 +115,6 @@ func (d *device) Read(buf []can.Msg) (n int, err error) {
 	return len(r), nil
 }
 
-func (d *device) Write(buf []can.Msg) (n int, err error) {
-	for i := range buf {
-		err := d.WriteMsg(&buf[i])
-		if err != nil {
-			return i, err
-		}
-	}
-	return len(buf), nil
-}
-
 func (d *device) WriteMsg(m *can.Msg) error {
 	if d.closed.Load() {
 		return wrapErr("write", can.ErrClosed)

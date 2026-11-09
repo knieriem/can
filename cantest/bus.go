@@ -86,15 +86,6 @@ func (d *busDev) WriteMsg(m *can.Msg) error {
 	return nil
 }
 
-func (d *busDev) Write(msgs []can.Msg) (int, error) {
-	for i := range msgs {
-		if err := d.WriteMsg(&msgs[i]); err != nil {
-			return i, err
-		}
-	}
-	return len(msgs), nil
-}
-
 func (d *busDev) ID() string { return "bus" }
 
 func (d *busDev) Close() error {
