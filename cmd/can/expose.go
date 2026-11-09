@@ -51,7 +51,7 @@ func runExpose(cmd *tool.Command, w io.Writer, args []string) error {
 	if len(args) > 1 {
 		devName = args[1]
 	}
-	d, err := can.Open(devName)
+	d, err := can.Open(devName, can.WithBusErrors()) // clients filter themselves
 	if err != nil {
 		return err
 	}

@@ -106,7 +106,8 @@ func (di *DeviceInfo) Format(idSep, itemSep, end string) string {
 type Option func(*openProps)
 
 type openProps struct {
-	conf *Config
+	conf   *Config
+	status statusLevel
 }
 
 func WithConfig(conf *Config) Option {
@@ -124,6 +125,9 @@ func WithConfig(conf *Config) Option {
 // to open any available CAN adapter with driver dependent default settings.
 // The comma separated ctl strings will be processed by [ParseConfig].
 // On success, a Device instance will be returned, else an error.
+//
+// Read delivers no status messages, unless WithStatusMsgs or
+// WithBusErrors is given.
 func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
 	var p openProps
 
@@ -153,7 +157,7 @@ func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
 			// Drivers may modify the config; give each its own copy.
 			dev, err = drv.Open(name, p.conf.clone())
 			if err == nil {
-				return
+				return withStatusFilter(dev, p.status), nil
 			}
 		}
 		err = Error("no device found")
@@ -165,7 +169,11 @@ func Open(deviceSpec string, opts ...Option) (dev Device, err error) {
 	}
 	for _, drv := range drvlist {
 		if drv.Name() == drvName {
-			return drv.Open(name, p.conf)
+			dev, err = drv.Open(name, p.conf)
+			if err != nil {
+				return nil, err
+			}
+			return withStatusFilter(dev, p.status), nil
 		}
 	}
 	err = Error("driver not found: " + drvName)
