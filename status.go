@@ -16,6 +16,11 @@ const (
 // at most once per second, as the controller retries endlessly), when
 // received frames were lost, and when the controller restarts.
 // Without this option or WithBusErrors, Read delivers no status messages.
+//
+// Many controllers report NoAck only with bus error reporting enabled,
+// config key E. Where NoAck is not reported, a missing acknowledge
+// still shows as a change to ErrorWarning and ErrorPassive, with a
+// rising transmit error counter.
 func WithStatusMsgs() Option {
 	return func(p *openProps) {
 		p.status = statusMsgs

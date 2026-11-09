@@ -18,6 +18,7 @@ type Config struct {
 	Termination Optional[bool]
 	FDMode      Optional[bool]
 	ListenOnly  Optional[bool]
+	BusErrors   Optional[bool]
 
 	MsgFilter []MsgFilter
 }
@@ -189,6 +190,16 @@ var ErrFDNotSupported = Error("FD mode not supported")
 //		while it is the only active node, it gets no acknowledge and
 //		retransmits its frame endlessly; a listen-only device then
 //		receives the same frame repeatedly.
+//
+//	E - bus error reporting
+//
+//		A boolean parameter. The controller reports each single bus
+//		error: a missing acknowledge (status event NoAck), and bit,
+//		stuff, form and CRC errors (BusError). Many controllers report
+//		NoAck only with this enabled. State changes, like ErrorWarning
+//		or BusOff, are reported regardless. On a disturbed bus, bus
+//		errors can occur thousands of times per second, which costs
+//		throughput on some controllers.
 func ParseConfig(specs ...string) (*Config, error) {
 	var c Config
 
@@ -294,6 +305,13 @@ func (c *Config) fromSpec(s string) error {
 		}
 		c.ListenOnly.Soft = soft
 		allowSoft = true
+	case "E":
+		err := parseBoolInt(&c.BusErrors, value)
+		if err != nil {
+			return err
+		}
+		c.BusErrors.Soft = soft
+		allowSoft = true
 	}
 	if soft && !allowSoft {
 		return fmt.Errorf("key %q may not be used with '?'", key)
@@ -314,7 +332,7 @@ func indexColon(s string) int {
 	return iColon
 }
 
-var boolKeys = []string{"fd", "T", "L"}
+var boolKeys = []string{"fd", "T", "L", "E"}
 
 func parseBoolInt(dest *Optional[bool], s string) error {
 	if s == "1" {
@@ -534,6 +552,7 @@ func (c *Config) Format(sep string) string {
 	}
 	enc.addOptBool("T", c.Termination)
 	enc.addOptBool("L", c.ListenOnly)
+	enc.addOptBool("E", c.BusErrors)
 	return strings.Join(enc.buf, sep)
 }
 

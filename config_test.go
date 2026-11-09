@@ -70,6 +70,9 @@ func deepEqualConfig(a, b *Config) bool {
 		(a.FDMode.Valid && a.FDMode.Soft != b.FDMode.Soft) {
 		return false
 	}
+	if a.BusErrors != b.BusErrors {
+		return false
+	}
 	if a.ListenOnly != b.ListenOnly {
 		return false
 	}
@@ -197,6 +200,15 @@ func TestParseConfig(t *testing.T) {
 				ListenOnly: newSoftBool(false),
 			},
 			wantFmt: "500k L0",
+		},
+		{
+			name:  "bus error reporting",
+			input: "500k E",
+			want: &Config{
+				Nominal:   newBitTimingConfig(500e3, 0, 0, 0, 0, 0, 0, 0, 0),
+				BusErrors: newOptionalBool(true),
+			},
+			wantFmt: "500k E",
 		},
 		{
 			name:  "complex config string",

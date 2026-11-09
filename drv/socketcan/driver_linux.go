@@ -165,9 +165,7 @@ func (drv *driver) Open(devName string, conf *can.Config) (can.Device, error) {
 			conf.FDMode.Valid = false
 			conf.Data.Valid = false
 		}
-		if conf.ListenOnly.Soft && !info.Can.SupportsListenOnly() {
-			conf.ListenOnly.Valid = false
-		}
+		info.Can.DropUnsupported(conf)
 		err = conf.ResolveBitTiming(ctl)
 		if err != nil {
 			return nil, err

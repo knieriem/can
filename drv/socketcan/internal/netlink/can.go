@@ -238,20 +238,40 @@ func (can *CanAttributes) needUpdate(conf *can.Config) (needUpdate bool, err err
 			return true, nil
 		}
 	}
-	if conf.ListenOnly.Valid {
-		have := can.CtrlMode.Flags&unix.CAN_CTRLMODE_LISTENONLY != 0
-		if have != conf.ListenOnly.Value {
+	for _, o := range optModes(conf) {
+		have := can.CtrlMode.Flags&o.flag != 0
+		if o.Valid && have != o.Value {
 			return true, nil
 		}
 	}
 	return false, nil
 }
 
-// SupportsListenOnly reports whether the controller supports listen-only
-// mode. Kernels that do not report supported modes are assumed to.
-func (can *CanAttributes) SupportsListenOnly() bool {
+// optMode pairs a boolean config setting with its CAN_CTRLMODE flag.
+type optMode struct {
+	*can.Optional[bool]
+	flag uint32
+}
+
+// optModes returns the config settings that map to a single control
+// mode flag each.
+func optModes(conf *can.Config) []optMode {
+	return []optMode{
+		{&conf.ListenOnly, unix.CAN_CTRLMODE_LISTENONLY},
+		{&conf.BusErrors, unix.CAN_CTRLMODE_BERR_REPORTING},
+	}
+}
+
+// DropUnsupported invalidates the soft (key?) settings in conf that
+// the controller does not support. Kernels that do not report
+// supported modes are assumed to support all.
+func (can *CanAttributes) DropUnsupported(conf *can.Config) {
 	sup := can.CtrlModeSupported
-	return sup == 0 || sup&unix.CAN_CTRLMODE_LISTENONLY != 0
+	for _, o := range optModes(conf) {
+		if o.Soft && sup != 0 && sup&o.flag == 0 {
+			o.Valid = false
+		}
+	}
 }
 
 // ListenOnly reports whether the controller is in listen-only mode.
@@ -341,10 +361,12 @@ func (can *canAttrEncoder) setConfig(conf *can.Config) {
 	if fd {
 		m.Flags |= unix.CAN_CTRLMODE_FD
 	}
-	if conf.ListenOnly.Valid {
-		m.Mask |= unix.CAN_CTRLMODE_LISTENONLY
-		if conf.ListenOnly.Value {
-			m.Flags |= unix.CAN_CTRLMODE_LISTENONLY
+	for _, o := range optModes(conf) {
+		if o.Valid {
+			m.Mask |= o.flag
+			if o.Value {
+				m.Flags |= o.flag
+			}
 		}
 	}
 	can.encodeData(unix.IFLA_CAN_CTRLMODE, m)
