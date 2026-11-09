@@ -118,3 +118,22 @@ func TestAllocs(t *testing.T) {
 		}
 	}
 }
+
+// TestFormat protects that Format output parses back to the same
+// message with FromExpr, for each frame type.
+func TestFormat(t *testing.T) {
+	for _, expr := range []string{
+		"123:AABB",
+		"18DAF105:11",
+		"123:R",
+		"18DAF105:R",
+	} {
+		var m Msg
+		if err := m.FromExpr(expr); err != nil {
+			t.Fatalf("FromExpr(%q): %v", expr, err)
+		}
+		if got := m.Format(); got != expr {
+			t.Errorf("FromExpr(%q).Format() = %q", expr, got)
+		}
+	}
+}

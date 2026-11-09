@@ -208,11 +208,11 @@ func (m *Msg) Format() string {
 	if m.ExtFrame() {
 		idFormat = "%08X:"
 	}
-	if m.Flags == RTRMsg {
+	fmt.Fprintf(&sb, idFormat, m.Id)
+	if m.Flags&RTRMsg != 0 {
 		sb.WriteByte('R')
 		return sb.String()
 	}
-	fmt.Fprintf(&sb, idFormat, m.Id)
 	fdFlags := 0
 	if m.Flags&FDSwitchBitrate != 0 {
 		fdFlags = 1
