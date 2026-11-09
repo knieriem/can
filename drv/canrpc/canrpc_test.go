@@ -20,7 +20,6 @@ type fakeDev struct {
 	errc     chan error
 	err      error
 	writeErr error // returned by WriteMsg
-	can.Unversioned
 }
 
 func newFakeDev() *fakeDev {
@@ -41,8 +40,11 @@ func (d *fakeDev) Read(buf []can.Msg) (int, error) {
 }
 
 func (d *fakeDev) WriteMsg(*can.Msg) error { return d.writeErr }
-func (d *fakeDev) ID() string              { return "fake" }
-func (d *fakeDev) Close() error            { return nil }
+func (d *fakeDev) Info() *can.DeviceInfo {
+	return &can.DeviceInfo{ID: "fake0", Driver: "fake"}
+}
+func (d *fakeDev) ID() string   { return "fake" }
+func (d *fakeDev) Close() error { return nil }
 
 // connect registers dev with an RPC server and returns a client device.
 func connect(t *testing.T, dev can.Device) can.Device {
@@ -190,5 +192,13 @@ func TestConnLost(t *testing.T) {
 
 	if _, err := readTimeout(d); !errors.Is(err, ErrConnLost) {
 		t.Errorf("Read: %v, want ErrConnLost", err)
+	}
+}
+
+// TestInfo protects that the client reports the remote device.
+func TestInfo(t *testing.T) {
+	d := connect(t, newFakeDev())
+	if got, want := d.Info().String(), "rpc:fake:fake0"; got != want {
+		t.Errorf("Info: %q, want %q", got, want)
 	}
 }

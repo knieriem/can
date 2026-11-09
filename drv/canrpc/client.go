@@ -50,7 +50,9 @@ type device struct {
 	cl     sync.Mutex
 	closed atomic.Bool
 	lost   atomic.Bool // the server did not reply to a ping in time
-	can.Unversioned
+
+	infoOnce sync.Once
+	info     can.DeviceInfo
 
 	// WriteMsg queues messages; flush sends them with one Write call
 	// at a time, which keeps their order. The server runs concurrent
@@ -145,8 +147,23 @@ func (*driver) Open(addr string, _ *can.Config) (cd can.Device, err error) {
 	return
 }
 
+// Info returns the remote device's information, with "rpc:" prefixed
+// to the driver name, or only "rpc" from a server before v0.6.
+func (d *device) Info() *can.DeviceInfo {
+	d.infoOnce.Do(func() {
+		var info can.DeviceInfo
+		if d.call("Info", 0, &info) != nil {
+			d.info = can.DeviceInfo{ID: "rpc", Driver: "rpc"}
+			return
+		}
+		info.Driver = "rpc:" + info.Driver
+		d.info = info
+	})
+	return &d.info
+}
+
 func (d *device) ID() string {
-	return "rpc"
+	return d.Info().ID
 }
 
 func (d *device) Read(buf []can.Msg) (n int, err error) {

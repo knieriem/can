@@ -199,6 +199,12 @@ func (o *object) WriteMsg(w *WireMsg, _ *int) (err error) {
 	return
 }
 
+// Info returns the device's information.
+func (o *object) Info(_ int, info *can.DeviceInfo) error {
+	*info = *o.dev.Info()
+	return nil
+}
+
 // Ping lets clients check that the server still replies.
 func (o *object) Ping(_ int, _ *int) error {
 	return nil
