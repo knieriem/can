@@ -70,6 +70,9 @@ func deepEqualConfig(a, b *Config) bool {
 		(a.FDMode.Valid && a.FDMode.Soft != b.FDMode.Soft) {
 		return false
 	}
+	if a.ListenOnly != b.ListenOnly {
+		return false
+	}
 
 	return true
 }
@@ -176,6 +179,24 @@ func TestParseConfig(t *testing.T) {
 				Termination: newOptionalBool(false),
 			},
 			wantFmt: "250k T0",
+		},
+		{
+			name:  "listen-only",
+			input: "500k L:1",
+			want: &Config{
+				Nominal:    newBitTimingConfig(500e3, 0, 0, 0, 0, 0, 0, 0, 0),
+				ListenOnly: newOptionalBool(true),
+			},
+			wantFmt: "500k L",
+		},
+		{
+			name:  "listen-only off, if supported",
+			input: "500k L?0",
+			want: &Config{
+				Nominal:    newBitTimingConfig(500e3, 0, 0, 0, 0, 0, 0, 0, 0),
+				ListenOnly: newSoftBool(false),
+			},
+			wantFmt: "500k L0",
 		},
 		{
 			name:  "complex config string",

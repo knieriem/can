@@ -74,7 +74,7 @@ func (s BusState) String() string {
 type Events uint16
 
 const (
-	NoAck      Events = 1 << iota // a transmitted frame was not acknowledged
+	NoAck      Events = 1 << iota // a frame this node sent was not acknowledged
 	BusError                      // bit, stuff, form or CRC error
 	RxOverflow                    // received frames were lost
 	TxTimeout                     // a frame could not be sent in time

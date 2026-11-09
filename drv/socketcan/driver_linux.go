@@ -93,6 +93,8 @@ type dev struct {
 	state  can.BusState // last known bus state; used by Read only
 	busOff atomic.Bool  // state is BusOff; read by WriteMsg
 	closed atomic.Bool
+
+	listenOnly bool
 }
 
 func (d *dev) ID() string {
@@ -163,6 +165,9 @@ func (drv *driver) Open(devName string, conf *can.Config) (can.Device, error) {
 			conf.FDMode.Valid = false
 			conf.Data.Valid = false
 		}
+		if conf.ListenOnly.Soft && !info.Can.SupportsListenOnly() {
+			conf.ListenOnly.Valid = false
+		}
 		err = conf.ResolveBitTiming(ctl)
 		if err != nil {
 			return nil, err
@@ -231,6 +236,7 @@ skipConfig:
 
 	d := new(dev)
 	d.mtu = int(info.Attr.MTU)
+	d.listenOnly = info.Can != nil && info.Can.ListenOnly()
 	err = unix.SetsockoptInt(fd, unix.SOL_CAN_RAW, unix.CAN_RAW_FD_FRAMES, 1)
 	if err != nil {
 		if d.mtu > linux.CAN_MTU {
@@ -451,6 +457,9 @@ func (d *dev) WriteMsg(msg *can.Msg) error {
 	// Linux reports bus-off on transmit only as a full queue. Read
 	// learns the state from error frames; a program that does not read
 	// gets ErrTxQueueFull instead.
+	if d.listenOnly {
+		return wrapErr("write", can.ErrListenOnly)
+	}
 	if d.busOff.Load() {
 		return wrapErr("write", can.ErrBusOff)
 	}

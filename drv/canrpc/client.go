@@ -304,6 +304,8 @@ func (d *device) wrapErr(op string, err error) error {
 			err = can.ErrTxQueueFull
 		} else if strings.Contains(s, can.ErrBusOff.Error()) {
 			err = can.ErrBusOff
+		} else if strings.Contains(s, can.ErrListenOnly.Error()) {
+			err = can.ErrListenOnly
 		}
 	}
 	return fmt.Errorf("canrpc: %s: %w", op, err)

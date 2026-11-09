@@ -238,7 +238,25 @@ func (can *CanAttributes) needUpdate(conf *can.Config) (needUpdate bool, err err
 			return true, nil
 		}
 	}
+	if conf.ListenOnly.Valid {
+		have := can.CtrlMode.Flags&unix.CAN_CTRLMODE_LISTENONLY != 0
+		if have != conf.ListenOnly.Value {
+			return true, nil
+		}
+	}
 	return false, nil
+}
+
+// SupportsListenOnly reports whether the controller supports listen-only
+// mode. Kernels that do not report supported modes are assumed to.
+func (can *CanAttributes) SupportsListenOnly() bool {
+	sup := can.CtrlModeSupported
+	return sup == 0 || sup&unix.CAN_CTRLMODE_LISTENONLY != 0
+}
+
+// ListenOnly reports whether the controller is in listen-only mode.
+func (can *CanAttributes) ListenOnly() bool {
+	return can.CtrlMode.Flags&unix.CAN_CTRLMODE_LISTENONLY != 0
 }
 
 func bittimingsEqual(btc *can.BitTimingConfig, bt *unix.CANBitTiming) bool {
@@ -316,17 +334,21 @@ func (can *canAttrEncoder) setConfig(conf *can.Config) {
 		}
 		can.setBittiming(unix.IFLA_CAN_DATA_BITTIMING, data)
 	}
-	can.SetFDMode(fd)
-	// TODO: support conf.Termination
-}
-
-func (can *canAttrEncoder) SetFDMode(v bool) {
+	// The kernel takes one CTRLMODE attribute; its mask selects
+	// the flags to change.
 	var m unix.CANCtrlMode
 	m.Mask = unix.CAN_CTRLMODE_FD
-	if v {
-		m.Flags = m.Mask
+	if fd {
+		m.Flags |= unix.CAN_CTRLMODE_FD
+	}
+	if conf.ListenOnly.Valid {
+		m.Mask |= unix.CAN_CTRLMODE_LISTENONLY
+		if conf.ListenOnly.Value {
+			m.Flags |= unix.CAN_CTRLMODE_LISTENONLY
+		}
 	}
 	can.encodeData(unix.IFLA_CAN_CTRLMODE, m)
+	// TODO: support conf.Termination
 }
 
 func (can *canAttrEncoder) setBittiming(t uint16, btc *can.BitTimingConfig) {

@@ -208,6 +208,10 @@ func (unsupported) Scan() []DeviceInfo { return nil }
 // once the device has been closed.
 var ErrClosed = Error("device closed")
 
+// ErrListenOnly is returned, wrapped, by WriteMsg when the device is in
+// listen-only mode (config key L), in which the controller does not send.
+var ErrListenOnly = Error("listen-only mode")
+
 // ErrBusOff is returned, wrapped, by WriteMsg when the controller is
 // in the bus-off state and cannot transmit.
 var ErrBusOff = Error("bus-off")

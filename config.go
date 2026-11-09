@@ -17,6 +17,7 @@ type Config struct {
 
 	Termination Optional[bool]
 	FDMode      Optional[bool]
+	ListenOnly  Optional[bool]
 
 	MsgFilter []MsgFilter
 }
@@ -179,6 +180,15 @@ var ErrFDNotSupported = Error("FD mode not supported")
 //	T - enable/disable termination resistor
 //
 //		This is a boolean parameter.
+//
+//	L - listen-only mode
+//
+//		A boolean parameter. In listen-only mode (also called monitoring
+//		mode), the controller receives, but neither sends nor acknowledges
+//		frames, and WriteMsg returns ErrListenOnly. If another node sends
+//		while it is the only active node, it gets no acknowledge and
+//		retransmits its frame endlessly; a listen-only device then
+//		receives the same frame repeatedly.
 func ParseConfig(specs ...string) (*Config, error) {
 	var c Config
 
@@ -277,6 +287,13 @@ func (c *Config) fromSpec(s string) error {
 		}
 		c.Termination.Soft = soft
 		allowSoft = true
+	case "L":
+		err := parseBoolInt(&c.ListenOnly, value)
+		if err != nil {
+			return err
+		}
+		c.ListenOnly.Soft = soft
+		allowSoft = true
 	}
 	if soft && !allowSoft {
 		return fmt.Errorf("key %q may not be used with '?'", key)
@@ -297,7 +314,7 @@ func indexColon(s string) int {
 	return iColon
 }
 
-var boolKeys = []string{"fd", "T"}
+var boolKeys = []string{"fd", "T", "L"}
 
 func parseBoolInt(dest *Optional[bool], s string) error {
 	if s == "1" {
@@ -516,6 +533,7 @@ func (c *Config) Format(sep string) string {
 		enc.addOptBool("fd", c.FDMode)
 	}
 	enc.addOptBool("T", c.Termination)
+	enc.addOptBool("L", c.ListenOnly)
 	return strings.Join(enc.buf, sep)
 }
 

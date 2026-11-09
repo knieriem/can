@@ -106,10 +106,11 @@ func (buses busList) reverseLookup(h api.Handle) (*bus, int) {
 }
 
 type dev struct {
-	info    can.DeviceInfo
-	h       api.Handle
-	bus     *bus
-	receive struct {
+	info       can.DeviceInfo
+	h          api.Handle
+	listenOnly bool
+	bus        *bus
+	receive    struct {
 		ev     windows.Handle
 		status api.Status
 		t0     can.Time
@@ -183,6 +184,15 @@ func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error)
 	if err != nil {
 		return nil, err
 	}
+	listenOnly := false
+	if conf != nil && conf.ListenOnly.Valid {
+		// PCAN-Basic takes the parameter before initialization.
+		st := h.SetValue(api.ListenOnly, conf.ListenOnly.Value)
+		if st != api.OK && !conf.ListenOnly.Soft {
+			return nil, fmt.Errorf("listen-only mode: %w", st)
+		}
+		listenOnly = st == api.OK && conf.ListenOnly.Value
+	}
 	if btStr != "" {
 		if err = h.InitializeFD(btStr); err != nil {
 			return nil, err
@@ -217,6 +227,7 @@ func (*driver) Open(devName string, conf *can.Config) (cd can.Device, err error)
 	}
 
 	d.h = h
+	d.listenOnly = listenOnly
 	d.info = can.DeviceInfo{
 		ID:     b.name + strconv.Itoa(i+1),
 		Driver: "pcan",
@@ -434,6 +445,9 @@ func (d *dev) WriteMsg(cm *can.Msg) (err error) {
 	}
 	if cm.IsStatus() {
 		return nil
+	}
+	if d.listenOnly {
+		return can.ErrListenOnly
 	}
 
 	var st api.Status
