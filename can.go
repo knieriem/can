@@ -24,9 +24,18 @@ type Driver interface {
 
 var drvlist []Driver
 
+// RegisterDriver makes drv available to Open and Scan. A driver with
+// the name of an earlier one replaces it, so that a program can import
+// drv/all and still register a driver with its own options.
 func RegisterDriver(drv Driver) {
 	if drv == UnsupportedDriver {
 		return
+	}
+	for i, d := range drvlist {
+		if d.Name() == drv.Name() {
+			drvlist[i] = drv
+			return
+		}
 	}
 	drvlist = append(drvlist, drv)
 }
