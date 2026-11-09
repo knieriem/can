@@ -2,23 +2,35 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package canrpc implements net/rpc client and server objects.
-// It is possible to register a can.Device with a server, and to speak
-// to the server via can.Device on the client side.
+// Package canrpc makes a can.Device available over net/rpc.
 //
-// The package automatically registers a driver with the can package
-// drivers list under the name "rpc". If, for example, a server is
-// running on host 192.168.1.2, port 6000, the address provided to
-// to the can.Open call would be written as:
+// On the server side, Register adds a device to an rpc.Server. On the
+// client side, can.Open with the driver name "rpc" connects to a
+// server. If, for example, a server runs on host 192.168.1.2, port 6000:
 //
 //	rpc:192.168.1.2:6000
 //
-// An optional name can be appended, prefixed by a slash, if the
-// server is exporting multiple CAN devices:
+// An optional name, prefixed by a slash, selects one of several
+// devices a server exports; it must match the name given to Register:
 //
 //	rpc:192.168.1.2:6000/device2
 //
-// The name must, of course, match the one configured in the server.
+// NewDevice makes a device from an existing RPC client, for example
+// one running over a tunnel.
+//
+// The client queues written messages and sends them in batches, so
+// that writing is not limited to one message per round trip. An error
+// of the remote device is returned by a later WriteMsg or by Close.
+// A client opened through can.Open pings the server, and reports
+// ErrConnLost when the server stops replying.
+//
+// Limitations: the clients of one registered device share a single
+// stream of received messages, so each message reaches only one of
+// them; use one client per device. The protocol has no authentication:
+// make a server reachable only through a secure channel, such as an
+// SSH tunnel.
+//
+// The package registers its driver with the can package when imported.
 package canrpc
 
 import (
