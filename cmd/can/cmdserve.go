@@ -16,9 +16,13 @@ import (
 )
 
 var cmdServe = &tool.Command{
-	UsageLine:    "serve addr [device]",
-	Short:        "serve a CAN device on a tcp port",
-	Long:         ``,
+	UsageLine: "serve addr [device]",
+	Short:     "serve a CAN device on a tcp port",
+	Long: `
+Serve makes the CAN device available to canrpc clients at addr.
+It has no authentication: bind it to localhost, for example
+127.0.0.1:6000, and reach it through an SSH tunnel.
+`,
 	ExtraArgsReq: 1,
 	ExtraArgsMax: 2,
 }
@@ -38,6 +42,9 @@ func runServe(cmd *tool.Command, w io.Writer, args []string) (err error) {
 		return
 	}
 	err = canrpc.Register(rpc.DefaultServer, d, "")
+	if err != nil {
+		return
+	}
 	l, err := net.Listen("tcp", args[0])
 	if err != nil {
 		return
