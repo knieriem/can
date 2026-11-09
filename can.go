@@ -205,6 +205,10 @@ func (unsupported) Scan() []DeviceInfo { return nil }
 // once the device has been closed.
 var ErrClosed = Error("device closed")
 
+// ErrBusOff is returned, wrapped, by WriteMsg when the controller is
+// in the bus-off state and cannot transmit.
+var ErrBusOff = Error("bus-off")
+
 // ErrTxQueueFull is returned when a Msg could not be added
 // to the devices' transmit queue. On Linux, it is returned
 // in case of ENOBUFS. Normally this error is caused by a wiring

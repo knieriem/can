@@ -14,13 +14,16 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/knieriem/can"
 )
 
-// An Opener opens a device. It is called once per subtest.
+// An Opener opens a device. It is called once per subtest. Opening with
+// can.WithStatusMsgs lets the suite tell lost frames the device
+// reported from frames lost unnoticed.
 type Opener func() (can.Device, error)
 
 // Options adjust the suite to the devices under test.
@@ -173,7 +176,11 @@ func (s *suite) testConcurrentWrite(t *testing.T) {
 		}
 		seq := int(binary.BigEndian.Uint16(m.Data()))
 		if seq != next[m.Id] {
-			t.Fatalf("id %#x: got seq %d, want %d", m.Id, seq, next[m.Id])
+			cause := "no overflow reported"
+			if r.overflow.Load() {
+				cause = "the device reported lost frames (rx-overflow)"
+			}
+			t.Fatalf("id %#x: got seq %d, want %d; %s", m.Id, seq, next[m.Id], cause)
 		}
 		next[m.Id]++
 	}
@@ -252,7 +259,8 @@ func (s *suite) testUseAfterClose(t *testing.T) {
 // reader reads data messages from a device in its own goroutine,
 // so that tests can wait with a timeout. Status messages are skipped.
 type reader struct {
-	c chan result
+	c        chan result
+	overflow atomic.Bool // the device reported lost frames
 }
 
 type result struct {
@@ -267,7 +275,10 @@ func newReader(d can.Device) *reader {
 		for {
 			n, err := d.Read(buf)
 			for i := range buf[:n] {
-				if buf[i].IsStatus() {
+				if st, ok := buf[i].Status(); ok {
+					if st.Events&can.RxOverflow != 0 {
+						r.overflow.Store(true)
+					}
 					continue
 				}
 				r.c <- result{m: buf[i].Clone()}

@@ -32,7 +32,7 @@ func TestVCAN(t *testing.T) {
 		t.Skipf("no interface %s", name)
 	}
 	open := func() (can.Device, error) {
-		return can.Open("socketcan:" + name)
+		return can.Open("socketcan:"+name, can.WithStatusMsgs())
 	}
 	fd := strings.TrimSpace(string(mtu)) == "72"
 	cantest.Run(t, open, open, cantest.Options{FD: fd})
@@ -54,7 +54,7 @@ func TestPair(t *testing.T) {
 		t.Fatalf("CAN_TEST_PAIR: want two specs separated by |, got %q", pair)
 	}
 	opener := func(spec string) cantest.Opener {
-		return func() (can.Device, error) { return can.Open(spec) }
+		return func() (can.Device, error) { return can.Open(spec, can.WithStatusMsgs()) }
 	}
 	cantest.Run(t, opener(tx), opener(rx), cantest.Options{FD: os.Getenv("CAN_TEST_FD") == "1"})
 }

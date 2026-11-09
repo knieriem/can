@@ -4,6 +4,7 @@
 package socketcan
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
+	"unsafe"
 
 	"golang.org/x/sys/unix"
 
@@ -59,12 +62,26 @@ type dev struct {
 	sendBufMu sync.Mutex
 	sendBuf   frame
 
+	// Receiving uses recvmsg, to get the kernel's drop counter
+	// (SO_RXQ_OVFL). Header and callback are prepared in Open,
+	// so that Read does not allocate.
+	rc      syscall.RawConn
 	recvBuf frame
+	iov     unix.Iovec
+	oob     [64]byte
+	msg     unix.Msghdr
+	recvFn  func(fd uintptr) bool
+	recvN   int
+	recvErr error
+	drops   uint32 // the drop counter at the last frame
+	pending bool   // recvBuf holds a frame not yet delivered
+
 	receive struct {
 		t0    can.Time
 		t0val int64
 	}
-	state can.BusState // last known bus state; used by Read only
+	state  can.BusState // last known bus state; used by Read only
+	busOff atomic.Bool  // state is BusOff; read by WriteMsg
 }
 
 func (d *dev) ID() string {
@@ -245,11 +262,20 @@ skipConfig:
 	if err != nil {
 		return nil, wrapErr("open", err)
 	}
+	// Ask the kernel to attach its drop counter to received frames.
+	// Older kernels may lack the option; then drops are not reported.
+	_ = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RXQ_OVFL, 1)
+
 	file, err := pollableFile(fd)
 	if err != nil {
 		return nil, wrapErr("open", err)
 	}
+	d.rc, err = file.SyscallConn()
+	if err != nil {
+		return nil, wrapErr("open", err)
+	}
 	d.file = file
+	d.setupRecv()
 	setupInfo(&d.info, info)
 	cleanupPriv = nil
 	ok = true
@@ -310,7 +336,7 @@ func rmemMax() (int, error) {
 }
 
 // pollableFile turns fd into an *os.File, that is managed by Go's runtime poller
-func pollableFile(fd int) (io.ReadWriteCloser, error) {
+func pollableFile(fd int) (*os.File, error) {
 	if err := unix.SetNonblock(fd, true); err != nil {
 		return nil, err
 	}
@@ -327,19 +353,91 @@ func setupInfo(info *can.DeviceInfo, link *netlink.Link) {
 }
 
 func (d *dev) Read(buf []can.Msg) (n int, err error) {
-	f := d.recvBuf
-	nRead, err := f.readFromN(d.file, d.mtu)
-	if err != nil {
-		return 0, wrapErr("read", closedErr(err))
+	if len(buf) == 0 {
+		return 0, nil
 	}
-	f.decode(&buf[0], nRead, &d.state)
-	return 1, nil
+	if !d.pending {
+		if err := d.recv(); err != nil {
+			return 0, wrapErr("read", closedErr(err))
+		}
+		if drops, ok := rxqDrops(d.oob[:d.msg.Controllen]); ok && drops != d.drops {
+			// Frames were dropped before this one: report that first.
+			d.drops = drops
+			buf[n].SetStatus(can.Status{State: d.state, Events: can.RxOverflow})
+			n++
+			if n == len(buf) {
+				d.pending = true
+				return n, nil
+			}
+		}
+	}
+	d.pending = false
+	d.recvBuf.decode(&buf[n], d.recvN, &d.state)
+	d.busOff.Store(d.state == can.BusOff)
+	return n + 1, nil
+}
+
+func (d *dev) setupRecv() {
+	d.iov.Base = &d.recvBuf.b[0]
+	d.iov.SetLen(d.mtu)
+	d.msg.Iov = &d.iov
+	d.msg.SetIovlen(1)
+	d.msg.Control = &d.oob[0]
+	d.recvFn = func(fd uintptr) bool {
+		r, _, e := unix.Syscall(unix.SYS_RECVMSG, fd, uintptr(unsafe.Pointer(&d.msg)), 0)
+		if e == unix.EAGAIN || e == unix.EINTR {
+			return false // wait for the next frame
+		}
+		d.recvN, d.recvErr = int(r), nil
+		if e != 0 {
+			d.recvErr = e
+		}
+		return true
+	}
+}
+
+// recv receives one frame into d.recvBuf, and the control
+// messages into d.oob.
+func (d *dev) recv() error {
+	d.msg.SetControllen(len(d.oob))
+	if err := d.rc.Read(d.recvFn); err != nil {
+		return err
+	}
+	if d.recvErr != nil {
+		return d.recvErr
+	}
+	if n := d.recvN; n < dataOffset || dataOffset+d.recvBuf.len() > n {
+		return fmt.Errorf("unexpected short read: %d bytes", n)
+	}
+	return nil
+}
+
+// rxqDrops returns the kernel's drop counter (SO_RXQ_OVFL)
+// from the control messages in oob.
+func rxqDrops(oob []byte) (drops uint32, ok bool) {
+	for len(oob) >= unix.SizeofCmsghdr {
+		h := (*unix.Cmsghdr)(unsafe.Pointer(&oob[0]))
+		l := int(h.Len)
+		if l < unix.SizeofCmsghdr || l > len(oob) {
+			return 0, false
+		}
+		if h.Level == unix.SOL_SOCKET && h.Type == unix.SO_RXQ_OVFL && l >= unix.CmsgLen(4) {
+			return binary.NativeEndian.Uint32(oob[unix.CmsgLen(0):]), true
+		}
+		oob = oob[min(unix.CmsgSpace(l-unix.CmsgLen(0)), len(oob)):]
+	}
+	return 0, false
 }
 
 func (d *dev) WriteMsg(msg *can.Msg) error {
-
 	if msg.IsStatus() {
 		return nil
+	}
+	// Linux reports bus-off on transmit only as a full queue. Read
+	// learns the state from error frames; a program that does not read
+	// gets ErrTxQueueFull instead.
+	if d.busOff.Load() {
+		return wrapErr("write", can.ErrBusOff)
 	}
 
 	d.sendBufMu.Lock()

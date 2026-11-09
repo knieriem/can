@@ -5,8 +5,6 @@ package socketcan
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
-	"io"
 
 	"github.com/knieriem/can"
 	"github.com/knieriem/can/drv/socketcan/internal/linux"
@@ -190,17 +188,6 @@ func (f *frame) decodeStatus(state *can.BusState) can.Status {
 		st.TxErr, st.RxErr, st.Counters = d[6], d[7], true
 	}
 	return st
-}
-
-func (f *frame) readFromN(r io.Reader, n int) (int, error) {
-	n, err := r.Read(f.b[:n])
-	if err != nil {
-		return 0, err
-	}
-	if n < dataOffset || dataOffset+f.len() > n {
-		return 0, fmt.Errorf("unexpected short read: %d bytes", n)
-	}
-	return n, nil
 }
 
 var ErrMTUExceeded = errors.New("frame length exceeds MTU")

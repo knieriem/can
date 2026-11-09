@@ -445,6 +445,8 @@ func (d *dev) WriteMsg(cm *can.Msg) (err error) {
 		return nil
 	case d.closed.Load():
 		return can.ErrClosed
+	case st.Test(api.ErrBUSOFF):
+		return can.ErrBusOff
 	case st.Test(api.ErrQXMTFULL):
 		return can.ErrTxQueueFull
 	}

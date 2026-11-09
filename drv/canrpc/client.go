@@ -281,7 +281,8 @@ func (d *device) Close() error {
 }
 
 // wrapErr adds context to err. As net/rpc transports server errors as
-// strings only, it recognizes ErrClosed and ErrTxQueueFull by their text.
+// strings only, it recognizes ErrClosed, ErrTxQueueFull and ErrBusOff
+// by their text.
 func (d *device) wrapErr(op string, err error) error {
 	var se rpc.ServerError
 	switch {
@@ -294,6 +295,8 @@ func (d *device) wrapErr(op string, err error) error {
 			err = can.ErrClosed
 		} else if strings.Contains(s, can.ErrTxQueueFull.Error()) {
 			err = can.ErrTxQueueFull
+		} else if strings.Contains(s, can.ErrBusOff.Error()) {
+			err = can.ErrBusOff
 		}
 	}
 	return fmt.Errorf("canrpc: %s: %w", op, err)
