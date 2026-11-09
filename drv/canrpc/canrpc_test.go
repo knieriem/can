@@ -81,8 +81,9 @@ func readTimeout(d can.Device) (can.Msg, error) {
 	}
 }
 
-// TestReadErrorNoHang: after the device fails, every Read returns
-// the error. Before, the second Read blocked forever.
+// TestReadErrorNoHang protects the fix for a server hang: after the
+// server-side device fails, every Read returns the error. Before, the
+// second Read blocked forever. The suite never makes that device fail.
 func TestReadErrorNoHang(t *testing.T) {
 	fd := newFakeDev()
 	d := connect(t, fd)
@@ -104,30 +105,9 @@ func TestReadErrorNoHang(t *testing.T) {
 	}
 }
 
-func TestCloseUnblocksRead(t *testing.T) {
-	d := connect(t, newFakeDev())
-	done := make(chan error, 1)
-	go func() {
-		_, err := readTimeout(d)
-		done <- err
-	}()
-	time.Sleep(50 * time.Millisecond)
-	if err := d.Close(); err != nil {
-		t.Fatalf("close: %v", err)
-	}
-	if err := <-done; !errors.Is(err, can.ErrClosed) {
-		t.Errorf("read after close: %v, want ErrClosed", err)
-	}
-	if err := d.Close(); !errors.Is(err, can.ErrClosed) {
-		t.Errorf("second close: %v, want ErrClosed", err)
-	}
-	if err := d.WriteMsg(new(can.Msg)); !errors.Is(err, can.ErrClosed) {
-		t.Errorf("write after close: %v, want ErrClosed", err)
-	}
-}
-
-// TestServerErrClosed: a closed server-side device is reported
-// as ErrClosed, although net/rpc transports only the error text.
+// TestServerErrClosed protects the error mapping across RPC: a closed
+// server-side device is reported as ErrClosed, although net/rpc
+// transports only the error text.
 func TestServerErrClosed(t *testing.T) {
 	fd := newFakeDev()
 	d := connect(t, fd)
@@ -137,8 +117,8 @@ func TestServerErrClosed(t *testing.T) {
 	}
 }
 
-// TestSuite runs the cantest suite through RPC connections
-// to devices on an in-memory bus.
+// TestSuite runs the cantest suite through RPC connections to devices
+// on an in-memory bus. It covers round trips, concurrency and Close.
 func TestSuite(t *testing.T) {
 	bus := cantest.NewBus()
 	open := func() (can.Device, error) {

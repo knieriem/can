@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+// TestSetData protects the basic round trip of SetData and Data
+// across inline and external storage.
 func TestSetData(t *testing.T) {
 	long := bytes.Repeat([]byte{0xAA}, 64)
 	var m Msg
@@ -16,18 +18,8 @@ func TestSetData(t *testing.T) {
 	}
 }
 
-// TestSetDataInPlace checks the old idiom: reslice Data, fill, SetData.
-func TestSetDataInPlace(t *testing.T) {
-	var m Msg
-	d := m.Data()[:3]
-	copy(d, []byte{1, 2, 3})
-	m.SetData(d)
-	if !bytes.Equal(m.Data(), []byte{1, 2, 3}) {
-		t.Errorf("Data() = % x", m.Data())
-	}
-}
-
-// TestSetDataAlias covers SetData with m's own storage.
+// TestSetDataAlias protects the in-place idiom: SetData with a slice
+// of m's own storage, as returned by Data, only updates the length.
 func TestSetDataAlias(t *testing.T) {
 	var m Msg
 	if d := m.Data(); len(d) != 0 || cap(d) != 8 {
@@ -68,6 +60,8 @@ func TestSetDataAlias(t *testing.T) {
 	}
 }
 
+// TestCopySemantics protects the documented copy behavior: a plain copy
+// has its own classic payload; Clone also copies long payloads.
 func TestCopySemantics(t *testing.T) {
 	var a Msg
 	a.SetData([]byte{1, 2})
@@ -85,6 +79,8 @@ func TestCopySemantics(t *testing.T) {
 	}
 }
 
+// TestReset protects that Reset clears the message but keeps
+// the payload storage for reuse.
 func TestReset(t *testing.T) {
 	var m Msg
 	m.Id = 0x123
@@ -99,6 +95,8 @@ func TestReset(t *testing.T) {
 	}
 }
 
+// TestAllocs protects the reason for Msg's design: no allocations
+// after warm-up, for classic, FD, mixed and in-place use.
 func TestAllocs(t *testing.T) {
 	var m Msg
 	fd := make([]byte, 64)

@@ -7,6 +7,8 @@ import (
 	"github.com/knieriem/can"
 )
 
+// TestWrapErrUnwrap protects that errors.Is sees through pcan's
+// wrapped errors. Without hardware, nothing else checks pcan errors.
 func TestWrapErrUnwrap(t *testing.T) {
 	err := error(can.ErrClosed)
 	wrapErr("read", &err)
