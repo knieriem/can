@@ -9,8 +9,6 @@ github.com/hashicorp/yamux v0.1.2/go.mod h1:C+zze2n6e/7wshOZep2A70/aQU6QBRWJO/G6
 github.com/jsimonetti/rtnetlink/v2 v2.2.0 h1:/KfZ310gOAFrXXol5VwnFEt+ucldD/0dsSRZwpHCP9w=
 github.com/jsimonetti/rtnetlink/v2 v2.2.0/go.mod h1:lbjDHxC+5RJ08lzPeA90Ls2pEoId3F08MoEMlhfHxeI=
 github.com/knieriem/g v0.1.2/go.mod h1:zYg1CmnYJBZ34OwOIRIqoBsvVxbGRjgE4kLQrHz7DBg=
-github.com/knieriem/g v0.5.0 h1:0WGfg4rfLD70T5e3SLZ9HtmmLQlRPChoKG15B3dfyqI=
-github.com/knieriem/g v0.5.0/go.mod h1:fhVCOebbqbZTIN+bv0aU/gOAasuZlP0ETeaF4N2553A=
 github.com/knieriem/text v0.11.0 h1:Dc4nKalTaIoNQL7jR+YbFzhdAgXYrowZYQTgh5uTV2U=
 github.com/knieriem/text v0.11.0/go.mod h1:nFN1r4dWMNr3tq/iqPWvNubGBcVSV41vH7D5lF0FzUs=
 github.com/knieriem/tool v0.2.0 h1:qAay3glIPSW3arVNX+QyUb9CC0CUoh6I284qIlUdQ+E=
@@ -26,7 +24,6 @@ golang.org/x/net v0.53.0/go.mod h1:JvMuJH7rrdiCfbeHoo3fCQU24Lf5JJwT9W3sJFulfgs=
 golang.org/x/sync v0.20.0 h1:e0PTpb7pjO8GAtTs2dQ6jYa5BWYlMuX047Dco/pItO4=
 golang.org/x/sync v0.20.0/go.mod h1:9xrNwdLfx4jkKbNva9FpL6vEN7evnE43NNNJQ2LF3+0=
 golang.org/x/sys v0.0.0-20180824143301-4910a1d54f87/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
-golang.org/x/sys v0.16.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
 golang.org/x/sys v0.43.0 h1:Rlag2XtaFTxp19wS8MXlJwTvoh8ArU6ezoyFsMyCTNI=
 golang.org/x/sys v0.43.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
 golang.org/x/tools v0.0.0-20180824175216-6c1c5e93cdc1/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
